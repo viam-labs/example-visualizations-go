@@ -1,0 +1,22 @@
+{
+  "$schema": "https://dl.viam.dev/module.schema.json",
+  "module_id": "viam:example-visualizations-go",
+  "visibility": "public",
+  "url": "https://github.com/viam-labs/example-visualizations-go",
+  "description": "Go port of viam:example-visualizations. Playground module that adds every supported geometry primitive (box, sphere, capsule, point, mesh PLY/STL, point cloud) to the Viam 3D scene viewer. Runtime DoCommands let you add/remove/update items, swap meshes, animate, snapshot the scene to a pasteable config, and toggle the renderer UUID strategy between stable+UPDATED (RDK fake pattern) and versioned (apriltag-tracker pattern).",
+  "models": [
+    {
+      "api": "rdk:service:world_state_store",
+      "model": "viam:example-visualizations-go:scene-primitives",
+      "short_description": "Single-service playground that renders every supported geometry primitive in the 3D scene viewer.",
+      "markdown_link": "README.md"
+    }
+  ],
+  "entrypoint": "bin/example-visualizations-go",
+  "build": {
+    "build": "make module.tar.gz",
+    "setup": "make setup",
+    "path": "module.tar.gz",
+    "arch": ["linux/amd64", "linux/arm64"]
+  }
+}
