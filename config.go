@@ -15,7 +15,7 @@ const (
 	DefaultTickHz       = 30.0
 	DefaultUUIDStrategy = "stable"
 	DefaultParentFrame  = "world"
-	DefaultPreset       = "primitives"
+	DefaultPreset       = "all"
 )
 
 var ValidUUIDStrategies = []string{"stable", "versioned"}
@@ -414,17 +414,36 @@ func resolveAssetPath(p string) string {
 	return p
 }
 
-// ModuleDir is set at startup by main.go. Defaults to CWD.
+// ModuleDir is the directory where the module was extracted by
+// viam-server — the tarball root. Assets live at <ModuleDir>/assets/.
+//
+// We resolve it from os.Executable() (parent of the binary's parent,
+// since the binary is at <ModuleDir>/bin/example-visualizations-go).
+// CWD when viam-server launches the module is NOT reliable; the
+// framework can run the binary from anywhere. Using executable path
+// is the only stable anchor.
+//
+// VIAM_MODULE_DATA, despite the name, points at a per-module data
+// dir for *runtime* state (logs, persistence) — NOT where the
+// module's bundled assets live. Don't use it for asset resolution.
 var ModuleDir string
 
 func init() {
-	if d, err := os.Getwd(); err == nil {
-		ModuleDir = d
+	exe, err := os.Executable()
+	if err == nil {
+		// <ModuleDir>/bin/example-visualizations-go → <ModuleDir>
+		ModuleDir = filepath.Dir(filepath.Dir(exe))
 	}
-	// VIAM_MODULE_DATA is the env var the framework sets to the
-	// module's runtime data directory; if present, use that.
-	if d := os.Getenv("VIAM_MODULE_DATA"); d != "" {
-		ModuleDir = d
+	// Fallback for tests / scripts run from the repo root.
+	if ModuleDir == "" || !dirHas(ModuleDir, "assets") {
+		if d, e := os.Getwd(); e == nil && dirHas(d, "assets") {
+			ModuleDir = d
+		}
 	}
+}
+
+func dirHas(dir, name string) bool {
+	info, err := os.Stat(filepath.Join(dir, name))
+	return err == nil && info.IsDir()
 }
 

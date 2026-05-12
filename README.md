@@ -40,9 +40,9 @@ Add the service to a machine, no config attributes needed:
 }
 ```
 
-Open the machine's **3D scene** tab. You'll see a 12-item primitives row spaced along the X axis: red box → green sphere → blue capsule → yellow point → purple arrow → magenta icosahedron (PLY) → orange Stanford bunny (STL) → cyan torus (PLY) → green Utah teapot (PLY) → multi-color sphere (PCD) → rainbow helix (PCD) → chunked-delivery sibling of the helix (PCD).
+Open the machine's **3D scene** tab. With no `preset` attribute set, the default loads `all` — every preset stacked along Y so you see the full tour in one viewport. To see just the 12-item primitives row, set `"preset": "primitives"` in the service attributes.
 
-Set `preset` to one of: `primitives` (default), `orientation_vectors`, `frame_composition`, `trajectory_preview`, `force_vector_demo`, `geometry_morph`, `lifecycle_demo`, `chunked_pcd_demo`, or `all` (every preset stacked along Y).
+`preset` can be set to one of: `all` (default), `primitives`, `orientation_vectors`, `frame_composition`, `trajectory_preview`, `force_vector_demo`, `geometry_morph`, `lifecycle_demo`, `chunked_pcd_demo`.
 
 ## Config / DoCommand reference
 
