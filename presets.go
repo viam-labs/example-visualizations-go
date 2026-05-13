@@ -78,6 +78,7 @@ func primitivesPreset() []Item {
 			Color:    &Color{R: 240, G: 50, B: 230},
 			Opacity:  ptr(1.0),
 		},
+		// STL→PLY converted at load time. Works.
 		{
 			Type: "mesh", Label: "demo_bunny",
 			Pose:     poseAt(2*sp, 0, 0),
@@ -85,35 +86,87 @@ func primitivesPreset() []Item {
 			Color:    &Color{R: 245, G: 130, B: 49},
 			Opacity:  ptr(1.0),
 		},
+		// Same bunny STL — shipped raw, content_type="stl", bypassing
+		// stl_to_ply. Bug-demo for the viz team: proto/RDK contract
+		// claims STL works (NewMeshFromProto at
+		// rdk/spatialmath/mesh.go:234-243 accepts both ply and stl)
+		// but the viewer drops it silently. Should render as empty
+		// space immediately right of the working twin.
+		{
+			Type: "mesh", Label: "demo_bunny_raw_stl",
+			Pose:     poseAt(3*sp, 0, 0),
+			MeshPath: "assets/bunny.stl",
+			RawSTL:   true,
+			Color:    &Color{R: 245, G: 130, B: 49},
+			Opacity:  ptr(1.0),
+		},
 		{
 			Type: "mesh", Label: "demo_torus",
-			Pose:     poseAt(3*sp, 0, 0),
+			Pose:     poseAt(4*sp, 0, 0),
 			MeshPath: "assets/torus.ply",
 			Color:    &Color{R: 70, G: 240, B: 240},
 			Opacity:  ptr(1.0),
 		},
 		{
 			Type: "mesh", Label: "demo_teapot",
-			Pose:     poseAt(4*sp, 0, 0),
+			Pose:     poseAt(5*sp, 0, 0),
 			MeshPath: "assets/teapot.ply",
 			Color:    &Color{R: 60, G: 180, B: 75},
 			Opacity:  ptr(1.0),
 		},
+		// PLY w/ per-vertex rainbow colors. The PLY's embedded
+		// `property uchar red/green/blue` is silently ignored by the
+		// viewer; our service transcodes those to metadata.colors,
+		// but the viewer collapses an N-vertex color array to a
+		// single uniform tint (the FIRST color). The whole sphere
+		// renders as one solid color. No `color` override here so
+		// the embedded vertex colors are the only color source.
+		{
+			Type: "mesh", Label: "demo_colorful_sphere_mesh",
+			Pose:     poseAt(6*sp, 0, 0),
+			MeshPath: "assets/colorful_sphere.ply",
+			Opacity:  ptr(1.0),
+		},
+		// PLY w/ per-FACE rainbow colors instead of per-vertex.
+		// Untested. The per-vertex case is known broken; this asset
+		// asks "does the same renderer treat per-FACE colors any
+		// differently?".
+		{
+			Type: "mesh", Label: "demo_colorful_sphere_faces_mesh",
+			Pose:     poseAt(7*sp, 0, 0),
+			MeshPath: "assets/colorful_sphere_faces.ply",
+			Opacity:  ptr(1.0),
+		},
+		// PLY w/ per-vertex UV coordinates and a `comment TextureFile`
+		// header. No texture image is shipped — commonpb.Mesh has no
+		// slot for texture bytes regardless. Untested. The question
+		// is what the viewer does when it receives a PLY whose
+		// header declares UV properties at all.
+		{
+			Type: "mesh", Label: "demo_uv_sphere_mesh",
+			Pose:     poseAt(8*sp, 0, 0),
+			MeshPath: "assets/uv_sphere.ply",
+			Opacity:  ptr(1.0),
+		},
+		// PCD version — per-point RGB embedded in the file body.
+		// Renders correctly because the viewer reads PCD per-point
+		// colors when metadata.colors is absent. Direct comparison
+		// with the three mesh siblings on the left.
 		{
 			Type: "pointcloud", Label: "demo_colorful_sphere",
-			Pose:           poseAt(5*sp, 0, 0),
+			Pose:           poseAt(9*sp, 0, 0),
 			PointcloudPath: "assets/colorful_sphere.pcd",
 			Opacity:        ptr(1.0),
 		},
 		{
 			Type: "pointcloud", Label: "demo_pointcloud",
-			Pose:           poseAt(6*sp, 0, 0),
+			Pose:           poseAt(10*sp, 0, 0),
 			PointcloudPath: "assets/helix.pcd",
 			Opacity:        ptr(1.0),
 		},
 		{
 			Type: "pointcloud", Label: "demo_pointcloud_chunked",
-			Pose:           poseAt(7*sp, 0, 0),
+			Pose:           poseAt(11*sp, 0, 0),
 			PointcloudPath: "assets/helix.pcd",
 			Opacity:        ptr(1.0),
 			Chunked:        true,

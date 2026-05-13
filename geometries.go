@@ -276,8 +276,16 @@ func buildPoint(label string) *commonpb.Geometry {
 	return buildSphere(PointMarkerRadiusMM, label)
 }
 
-func buildMesh(plyBytes []byte, contentType, label string) (*commonpb.Geometry, error) {
-	if contentType != RendererMeshContentType {
+// buildMesh embeds mesh bytes into a Geometry. contentType MUST be
+// "ply" unless allowNonPLY is set — the viewer only renders PLY.
+// The opt-out exists for the playground's raw-STL bug-demo, which
+// ships raw STL bytes with content_type="stl" specifically to show
+// the viewer's silent-drop behavior. The proto/RDK contract claims
+// STL support (rdk/spatialmath/mesh.go:234-243 NewMeshFromProto
+// accepts both) but the viewer drops it. See the Python sibling's
+// LESSONS.md::mesh-formats.
+func buildMesh(plyBytes []byte, contentType, label string, allowNonPLY bool) (*commonpb.Geometry, error) {
+	if !allowNonPLY && contentType != RendererMeshContentType {
 		return nil, fmt.Errorf("build_mesh requires content_type %q; got %q (STL must be converted via stlToPLY first)",
 			RendererMeshContentType, contentType)
 	}

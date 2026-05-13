@@ -130,13 +130,20 @@ func TestBuildPointUsesVisibleRadius(t *testing.T) {
 }
 
 func TestBuildMeshRequiresPLY(t *testing.T) {
-	_, err := buildMesh([]byte("xx"), "stl", "x")
+	_, err := buildMesh([]byte("xx"), "stl", "x", false)
 	if err == nil {
-		t.Fatal("expected error for content_type=stl")
+		t.Fatal("expected error for content_type=stl without allowNonPLY")
 	}
-	_, err = buildMesh([]byte("xx"), "ply", "x")
+	_, err = buildMesh([]byte("xx"), "ply", "x", false)
 	if err != nil {
 		t.Errorf("ply should succeed: %v", err)
+	}
+	// allowNonPLY=true bypasses the guard — used by the raw-STL
+	// bug-demo. The viewer drops the result silently, but build_mesh
+	// returns the Geometry without error.
+	_, err = buildMesh([]byte("xx"), "stl", "x", true)
+	if err != nil {
+		t.Errorf("stl with allowNonPLY should succeed: %v", err)
 	}
 }
 

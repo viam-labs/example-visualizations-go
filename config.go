@@ -40,6 +40,7 @@ type ItemConfig struct {
 	RadiusMM        *float64         `json:"radius_mm,omitempty"`
 	LengthMM        *float64         `json:"length_mm,omitempty"`
 	MeshPath        string           `json:"mesh_path,omitempty"`
+	RawSTL          bool             `json:"raw_stl,omitempty"`
 	PointcloudPath  string           `json:"pointcloud_path,omitempty"`
 	Color           *ColorJSON       `json:"color,omitempty"`
 	Opacity         *float64         `json:"opacity,omitempty"`
@@ -229,6 +230,7 @@ type Item struct {
 	RadiusMM       float64
 	LengthMM       float64
 	MeshPath       string
+	RawSTL         bool
 	PointcloudPath string
 	Color          *Color
 	Opacity        *float64
@@ -252,6 +254,7 @@ func (ic ItemConfig) toItem() Item {
 		Chunked:        ic.Chunked,
 		ChunkSize:      ic.ChunkSize,
 		MeshPath:       ic.MeshPath,
+		RawSTL:         ic.RawSTL,
 		PointcloudPath: ic.PointcloudPath,
 		Animation:      ic.Animation.toAnimation(),
 	}
@@ -378,12 +381,17 @@ func validateItem(it ItemConfig, path string, idx int) error {
 		if it.MeshPath == "" {
 			return fmt.Errorf("%s mesh requires 'mesh_path'", where)
 		}
-		if _, err := inferMeshContentType(it.MeshPath); err != nil {
+		meshFmt, err := inferMeshContentType(it.MeshPath)
+		if err != nil {
 			return fmt.Errorf("%s %w", where, err)
 		}
 		resolved := resolveAssetPath(it.MeshPath)
 		if _, err := os.Stat(resolved); err != nil {
 			return fmt.Errorf("%s mesh asset not found: %s", where, resolved)
+		}
+		if it.RawSTL && meshFmt != "stl" {
+			return fmt.Errorf("%s mesh 'raw_stl' only valid on .stl assets; got %q (inferred %q)",
+				where, it.MeshPath, meshFmt)
 		}
 	case "pointcloud":
 		if it.PointcloudPath == "" {

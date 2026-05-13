@@ -379,11 +379,18 @@ func buildGeometryForItem(item Item, geom BaseGeom) (*commonpb.Geometry, error) 
 		if err != nil {
 			return nil, fmt.Errorf("read mesh %s: %w", path, err)
 		}
+		// raw_stl: bug-demo for the viz team — ship the STL bytes
+		// straight through with content_type="stl" so the viewer's
+		// silent-drop is observable. See LESSONS.md::mesh-formats
+		// in the Python sibling repo.
+		if item.RawSTL {
+			return buildMesh(raw, "stl", item.Label, true)
+		}
 		ply, err := loadMeshBytesAsPLY(raw, item.MeshPath)
 		if err != nil {
 			return nil, err
 		}
-		return buildMesh(ply, "ply", item.Label)
+		return buildMesh(ply, "ply", item.Label, false)
 	case "pointcloud":
 		if geom.pcdBytesOverride != nil {
 			return buildPointcloud(geom.pcdBytesOverride, item.Label), nil
