@@ -2,7 +2,7 @@
 
 Go port of [`viam:example-visualizations`](https://github.com/viam-labs/example-visualizations-python) — a Viam module that adds every supported geometry primitive (box, sphere, capsule, point, mesh PLY/STL, point cloud PCD) to the Viam 3D scene viewer so you can poke each one and see what its config knobs do.
 
-The module is a single `rdk:service:world_state_store` implementation called **`viam:example-visualizations-go:scene-primitives`**. Same behaviour, same wire format, same gotchas as the Python original. Default config emits one of every primitive in a row along X. Runtime `DoCommand` verbs let you add, remove, update, animate, snapshot, and toggle the renderer UUID strategy without reconfiguring.
+The module is a single `rdk:service:world_state_store` implementation called **`viam:example-visualizations-go:playground`**. Same behaviour, same wire format, same gotchas as the Python original. Default config emits one of every primitive in a row along X. Runtime `DoCommand` verbs let you add, remove, update, animate, snapshot, and toggle the renderer UUID strategy without reconfiguring.
 
 > See the Python version's [LESSONS.md](https://github.com/viam-labs/example-visualizations-python/blob/main/LESSONS.md) for the full set of findings about the viewer's wire format. Everything documented there applies here verbatim — Go and Python differ only in implementation language, not in what the renderer accepts.
 
@@ -33,7 +33,7 @@ Add the service to a machine, no config attributes needed:
       "name": "scene",
       "namespace": "rdk",
       "type": "world_state_store",
-      "model": "viam:example-visualizations-go:scene-primitives",
+      "model": "viam:example-visualizations-go:playground",
       "attributes": {}
     }
   ]

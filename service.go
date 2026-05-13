@@ -41,7 +41,7 @@ import (
 )
 
 // Model is the registered model identifier.
-var Model = resource.NewModel("viam", "example-visualizations-go", "scene-primitives")
+var Model = resource.NewModel("viam", "example-visualizations-go", "playground")
 
 func init() {
 	resource.RegisterService(worldstatestore.API, Model,

@@ -1,4 +1,4 @@
-// Animation modes for the scene-primitives playground.
+// Animation modes for the example-visualizations-go playground.
 //
 // An Item's Animation block selects a mode and per-mode params. At
 // each tick, ComputeTick returns the per-item pose + geometry

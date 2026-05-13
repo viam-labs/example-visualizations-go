@@ -6,7 +6,7 @@ Operational context for future agents working on this repo. This is the **Go por
 
 - **GitHub:** `viam-labs/example-visualizations-go`
 - **Registry:** `viam:example-visualizations-go`
-- **Model:** `viam:example-visualizations-go:scene-primitives`
+- **Model:** `viam:example-visualizations-go:playground`
 - **API:** `rdk:service:world_state_store`
 - **Sibling:** [`viam-labs/example-visualizations-python`](https://github.com/viam-labs/example-visualizations-python) — the Python original, primary playground for finding renderer-side gotchas. Read its `LESSONS.md` before debugging anything wire-format-shaped.
 
