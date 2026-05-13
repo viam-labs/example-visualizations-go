@@ -1,10 +1,10 @@
 # example-visualizations-go
 
-Go port of [`viam:example-visualizations`](https://github.com/viam-labs/example-visualizations) — a Viam module that adds every supported geometry primitive (box, sphere, capsule, point, mesh PLY/STL, point cloud PCD) to the Viam 3D scene viewer so you can poke each one and see what its config knobs do.
+Go port of [`viam:example-visualizations`](https://github.com/viam-labs/example-visualizations-python) — a Viam module that adds every supported geometry primitive (box, sphere, capsule, point, mesh PLY/STL, point cloud PCD) to the Viam 3D scene viewer so you can poke each one and see what its config knobs do.
 
 The module is a single `rdk:service:world_state_store` implementation called **`viam:example-visualizations-go:scene-primitives`**. Same behaviour, same wire format, same gotchas as the Python original. Default config emits one of every primitive in a row along X. Runtime `DoCommand` verbs let you add, remove, update, animate, snapshot, and toggle the renderer UUID strategy without reconfiguring.
 
-> See the Python version's [LESSONS.md](https://github.com/viam-labs/example-visualizations/blob/main/LESSONS.md) for the full set of findings about the viewer's wire format. Everything documented there applies here verbatim — Go and Python differ only in implementation language, not in what the renderer accepts.
+> See the Python version's [LESSONS.md](https://github.com/viam-labs/example-visualizations-python/blob/main/LESSONS.md) for the full set of findings about the viewer's wire format. Everything documented there applies here verbatim — Go and Python differ only in implementation language, not in what the renderer accepts.
 
 ## Why two versions?
 
@@ -46,7 +46,7 @@ Open the machine's **3D scene** tab. With no `preset` attribute set, the default
 
 ## Config / DoCommand reference
 
-The config schema and DoCommand surface match the Python version 1:1. See [`viam-labs/example-visualizations/README.md`](https://github.com/viam-labs/example-visualizations/blob/main/README.md#config-reference) for the full reference — the JSON wire format is identical.
+The config schema and DoCommand surface match the Python version 1:1. See [`viam-labs/example-visualizations-python/README.md`](https://github.com/viam-labs/example-visualizations-python/blob/main/README.md#config-reference) for the full reference — the JSON wire format is identical.
 
 Animation modes available: `none`, `orbit`, `oscillate`, `spin`, `swing`, `pulse`, `trajectory`, `force_vector`, `breathe`, `flicker`, `lifecycle`.
 
@@ -77,7 +77,7 @@ Single Go package at the repo root. Each file owns one concern:
 
 ## Conventions and gotchas
 
-Everything in [LESSONS.md from the Python version](https://github.com/viam-labs/example-visualizations/blob/main/LESSONS.md) applies. The load-bearing ones for Go authors:
+Everything in [LESSONS.md from the Python version](https://github.com/viam-labs/example-visualizations-python/blob/main/LESSONS.md) applies. The load-bearing ones for Go authors:
 
 - **Field-mask paths are camelCase.** The official worldstatestore guide says snake_case; the renderer empirically only honors the camelCase form. See `animation.go::Path*` for the canonical constants.
 - **PCD format must match `pointcloud.ToPCD` byte-for-byte.** Leading `#` comments and `VERSION 0.7` (vs `VERSION .7`) both break the viewer's strict-order parser. We ship the same generated assets as the Python module.

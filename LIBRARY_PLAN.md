@@ -9,11 +9,11 @@ A Go library that extracts the reusable scaffolding from this module so a Viam w
 
 ## Why now (and not earlier)
 
-This is the second pass at a library plan. The first pass (now lives in [`example-visualizations/LIBRARY_PLAN.md`](https://github.com/viam-labs/example-visualizations/blob/main/LIBRARY_PLAN.md)) chose Python because the prototype was Python and most Viam module authors write Python. That's still true.
+This is the second pass at a library plan. The first pass (now lives in [`example-visualizations-python/LIBRARY_PLAN.md`](https://github.com/viam-labs/example-visualizations-python/blob/main/LIBRARY_PLAN.md)) chose Python because the prototype was Python and most Viam module authors write Python. That's still true.
 
 The case for Go now is concrete in a way it wasn't before:
 
-- **There's a working Go module to extract from.** [`example-visualizations-go`](https://github.com/viam-labs/example-visualizations-go) ships the same scene as the Python original — 3,634 lines of Go that already handle every gotcha in [`LESSONS.md`](https://github.com/viam-labs/example-visualizations/blob/main/LESSONS.md). Library design becomes "factor this out" instead of "imagine what we'd want."
+- **There's a working Go module to extract from.** [`example-visualizations-go`](https://github.com/viam-labs/example-visualizations-go) ships the same scene as the Python original — 3,634 lines of Go that already handle every gotcha in [`LESSONS.md`](https://github.com/viam-labs/example-visualizations-python/blob/main/LESSONS.md). Library design becomes "factor this out" instead of "imagine what we'd want."
 - **`viamkit/viz` already exists.** It owns `Box`/`Sphere`/`Capsule`/`Point` `*commonpb.Transform` builders. ViamVizHelpers can build on it instead of duplicating the easy 20%.
 - **Upstream merge target is Go.** `viamrobotics/visualization` is the canonical viewer-side repo. A Go library can share types with the viewer at the upstream-merge point with no language jump.
 
@@ -245,7 +245,7 @@ Most likely outcome: starts at viam-labs, lands in `viamkit/viz` once the wire f
 
 ## Risks
 
-- **Viewer wire format is partially undocumented.** [`LESSONS.md::chunked-delivery-schema`](https://github.com/viam-labs/example-visualizations/blob/main/LESSONS.md) is the worst offender. Mitigation: gate experimental features behind explicit knobs; mark them in godoc. Don't let unverified contracts ship in the default path.
+- **Viewer wire format is partially undocumented.** [`LESSONS.md::chunked-delivery-schema`](https://github.com/viam-labs/example-visualizations-python/blob/main/LESSONS.md) is the worst offender. Mitigation: gate experimental features behind explicit knobs; mark them in godoc. Don't let unverified contracts ship in the default path.
 - **Field-mask paths could flip from camelCase to snake_case in a future viewer.** Mitigation: paths centralized in `fieldmask.go`. A renderer-side change is a one-commit library update.
 - **API churn pre-1.0.** Module authors adopting 0.x take the upgrade tax. Mitigation: each release ships migration notes for any breaking change. Semver from 1.0.
 - **`viamkit/viz` evolves under us.** If the viamkit maintainer expands `viz.*` to overlap with `vizhelpers.*`, we have to reconcile. Mitigation: keep a one-line dependency on `viamkit/viz` for the primitive builders only, so any divergence shows up at compile time.

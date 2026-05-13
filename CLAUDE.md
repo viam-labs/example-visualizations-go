@@ -1,6 +1,6 @@
 # CLAUDE.md — example-visualizations-go
 
-Operational context for future agents working on this repo. This is the **Go port** of `viam-labs/example-visualizations` (Python). The two modules emit the same wire format and accept the same config schema; the differences are language-level only.
+Operational context for future agents working on this repo. This is the **Go port** of `viam-labs/example-visualizations-python` (Python). The two modules emit the same wire format and accept the same config schema; the differences are language-level only.
 
 ## What this is
 
@@ -8,7 +8,7 @@ Operational context for future agents working on this repo. This is the **Go por
 - **Registry:** `viam:example-visualizations-go`
 - **Model:** `viam:example-visualizations-go:scene-primitives`
 - **API:** `rdk:service:world_state_store`
-- **Sibling:** [`viam-labs/example-visualizations`](https://github.com/viam-labs/example-visualizations) — the Python original, primary playground for finding renderer-side gotchas. Read its `LESSONS.md` before debugging anything wire-format-shaped.
+- **Sibling:** [`viam-labs/example-visualizations-python`](https://github.com/viam-labs/example-visualizations-python) — the Python original, primary playground for finding renderer-side gotchas. Read its `LESSONS.md` before debugging anything wire-format-shaped.
 
 ## File layout
 
