@@ -7,11 +7,121 @@ package exampleviz
 import (
 	"fmt"
 	"math"
+	"regexp"
+	"strings"
 )
 
 // PrimitiveRowSpacingMM — X-axis spacing between primitives in the
 // row-style preset.
 const PrimitiveRowSpacingMM = 400.0
+
+// ---- Label constants (must match Python sibling repo's presets.py and
+// scripts/generate_assets.py). The text PLY assets are baked in the
+// Python repo and copied verbatim into ours, so the filename
+// convention and sizing have to agree.
+
+const (
+	ItemLabelHeightMM   = 25.0
+	RowLabelHeightMM    = 70.0
+	ItemLabelZOffsetMM  = -180.0 // labels sit BELOW the item
+	RowLabelZOffsetMM   = 0.0    // row labels inline with row items
+)
+
+// Item-label color palette — dark, varied. Cycled by a deterministic
+// hash of the label text so the same label always gets the same
+// color across reconfigure cycles.
+var itemLabelColors = []Color{
+	{R: 50, G: 50, B: 50},    // near-black
+	{R: 90, G: 30, B: 90},    // dark plum
+	{R: 30, G: 70, B: 50},    // dark teal-green
+	{R: 110, G: 60, B: 30},   // dark sienna
+	{R: 30, G: 50, B: 100},   // dark navy
+}
+
+// rowLabelColor — single distinct color for row labels.
+var rowLabelColor = Color{R: 30, G: 30, B: 80}
+
+// labelAssetFilenameSafeRe — characters that aren't [A-Za-z0-9_-] get
+// replaced with '_' so filenames stay portable. Must match Python's
+// re.sub(r"[^A-Za-z0-9_-]", "_", text).
+var labelAssetFilenameSafeRe = regexp.MustCompile(`[^A-Za-z0-9_-]`)
+
+func labelAssetFilename(text string, heightMM float64) string {
+	safe := labelAssetFilenameSafeRe.ReplaceAllString(text, "_")
+	return fmt.Sprintf("text__%dmm__%s.ply", int(heightMM+0.5), safe)
+}
+
+// shouldLabel — only label items in the world frame, skip repeating
+// groups (flicker grids, color-wheel children). Mirrors
+// presets.py::_should_label.
+func shouldLabel(it Item) bool {
+	if it.Label == "" {
+		return false
+	}
+	if strings.HasPrefix(it.Label, "label_") {
+		return false
+	}
+	if strings.Contains(it.Label, "morph_grid") || strings.Contains(it.Label, "_wheel_") {
+		return false
+	}
+	if it.ParentFrame != "" && it.ParentFrame != "world" {
+		return false
+	}
+	return true
+}
+
+// labelColorFor — deterministic palette pick from sum-of-ords.
+func labelColorFor(target string) Color {
+	sum := 0
+	for _, r := range target {
+		sum += int(r)
+	}
+	return itemLabelColors[sum%len(itemLabelColors)]
+}
+
+// labelFor — build a label-mesh item floating below `target`.
+func labelFor(target Item) Item {
+	c := labelColorFor(target.Label)
+	return Item{
+		Type:  "mesh",
+		Label: "label_" + target.Label,
+		Pose: Pose{
+			X:  target.Pose.X,
+			Y:  target.Pose.Y,
+			Z:  target.Pose.Z + ItemLabelZOffsetMM,
+			OZ: 1.0,
+		},
+		MeshPath: "assets/" + labelAssetFilename(target.Label, ItemLabelHeightMM),
+		Color:    &c,
+		Opacity:  ptr(1.0),
+	}
+}
+
+// withItemLabels — append a label-mesh sibling to every world-parented
+// item that passes shouldLabel.
+func withItemLabels(items []Item) []Item {
+	out := make([]Item, 0, len(items)*2)
+	out = append(out, items...)
+	for _, it := range items {
+		if shouldLabel(it) {
+			out = append(out, labelFor(it))
+		}
+	}
+	return out
+}
+
+// rowLabel — large text-label-mesh at the left edge of a row,
+// inline with the row's items (Z = 0).
+func rowLabel(rowName string, y, x float64) Item {
+	return Item{
+		Type:     "mesh",
+		Label:    "label_row_" + rowName,
+		Pose:     Pose{X: x, Y: y, Z: RowLabelZOffsetMM, OZ: 1.0},
+		MeshPath: "assets/" + labelAssetFilename(rowName, RowLabelHeightMM),
+		Color:    &rowLabelColor,
+		Opacity:  ptr(1.0),
+	}
+}
 
 // Presets — registry of named bundle functions.
 var Presets = map[string]func() []Item{
@@ -637,15 +747,30 @@ func allPreset() []Item {
 	row := 500.0
 	armGap := 1500.0
 	out := []Item{}
-	out = append(out, offsetBaseItems(trajectoryPreviewPreset(), "y", -2*row)...)
-	out = append(out, offsetBaseItemsY(orientationVectorsPreset(), -row)...)
-	out = append(out, offsetBaseItemsY(primitivesPreset(), 0.0)...)
-	out = append(out, offsetBaseItemsY(lifecycleDemoPreset(), row)...)
-	out = append(out, offsetBaseItemsY(geometryMorphPreset(), 2*row)...)
-	fv := offsetBaseItems(forceVectorDemoPreset(), "x", -500.0)
+	// Wrap each sub-preset with item-labels before offsetting into
+	// its row so labels follow their target items.
+	out = append(out, offsetBaseItems(withItemLabels(trajectoryPreviewPreset()), "y", -2*row)...)
+	out = append(out, offsetBaseItemsY(withItemLabels(orientationVectorsPreset()), -row)...)
+	out = append(out, offsetBaseItemsY(withItemLabels(primitivesPreset()), 0.0)...)
+	out = append(out, offsetBaseItemsY(withItemLabels(lifecycleDemoPreset()), row)...)
+	out = append(out, offsetBaseItemsY(withItemLabels(geometryMorphPreset()), 2*row)...)
+	fv := offsetBaseItems(withItemLabels(forceVectorDemoPreset()), "x", -500.0)
 	fv = offsetBaseItems(fv, "y", 2*row)
 	out = append(out, fv...)
-	out = append(out, offsetBaseItemsY(frameCompositionPreset(), 2*row+armGap)...)
+	out = append(out, offsetBaseItemsY(withItemLabels(frameCompositionPreset()), 2*row+armGap)...)
+
+	// Row labels: inline with each row's Z plane, just to the left
+	// of the row's leftmost item.
+	rowLabelX := -2200.0
+	out = append(out, rowLabel("trajectory_preview", -2*row, rowLabelX))
+	out = append(out, rowLabel("orientation_vectors", -row, rowLabelX))
+	out = append(out, rowLabel("primitives", 0.0, rowLabelX))
+	out = append(out, rowLabel("lifecycle_demo", row, rowLabelX))
+	// force_vector_demo + geometry_morph share row Y; split labels by
+	// ±70 mm in Y so the names don't overlap.
+	out = append(out, rowLabel("force_vector_demo", 2*row-70.0, rowLabelX))
+	out = append(out, rowLabel("geometry_morph", 2*row+70.0, rowLabelX))
+	out = append(out, rowLabel("frame_composition", 2*row+armGap, rowLabelX))
 	return out
 }
 
