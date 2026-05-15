@@ -695,6 +695,9 @@ func (s *SceneServiceBase) DoCommand(ctx context.Context, command map[string]any
 			"parent_frame":  s.parentFrame,
 			"items":         items,
 		}}, nil
+
+	case "apply_events":
+		return s.applyEvents(command)
 	}
 
 	// Custom verbs through the hooks.
@@ -716,6 +719,130 @@ func (s *SceneServiceBase) DoCommand(ctx context.Context, command map[string]any
 		"item_count":       len(s.state),
 		"subscriber_count": len(s.subscribers),
 		"tick_running":     s.tickStop != nil,
+	}, nil
+}
+
+// applyEvents handles the apply_events DoCommand verb — the batched
+// wire-format input the driver→visualizer pipeline sends. Mirrors
+// the Python implementation. Errors are recorded per-event so a
+// single bad event doesn't abort the batch.
+func (s *SceneServiceBase) applyEvents(command map[string]any) (map[string]any, error) {
+	rawEvents, _ := command["events"].([]any)
+	namespace, _ := command["namespace"].(string)
+	prefix := ""
+	if namespace != "" {
+		prefix = namespace + "/"
+	}
+
+	var added, updated, removed int
+	errors := []string{}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, raw := range rawEvents {
+		evt, ok := raw.(map[string]any)
+		if !ok {
+			errors = append(errors, fmt.Sprintf("event[%d]: not a dict", i))
+			continue
+		}
+		kind, _ := evt["kind"].(string)
+		rawLabel, _ := evt["label"].(string)
+		if rawLabel == "" {
+			errors = append(errors, fmt.Sprintf("event[%d]: missing 'label'", i))
+			continue
+		}
+		label := prefix + rawLabel
+
+		switch kind {
+		case "added":
+			itemMap, _ := evt["item"].(map[string]any)
+			item, err := ItemFromMap(itemMap)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("event[%d] (%q): %v", i, rawLabel, err))
+				continue
+			}
+			item.Label = label
+			if _, exists := s.state[label]; exists {
+				errors = append(errors, fmt.Sprintf("event[%d] (%q): label already exists", i, rawLabel))
+				continue
+			}
+			if err := s.installItemLocked(item); err != nil {
+				errors = append(errors, fmt.Sprintf("event[%d] (%q): %v", i, rawLabel, err))
+				continue
+			}
+			s.broadcastLocked(worldstatestore.TransformChange{
+				ChangeType: wsspb.TransformChangeType_TRANSFORM_CHANGE_TYPE_ADDED,
+				Transform:  s.state[label].Transform,
+			})
+			added++
+
+		case "updated":
+			st, ok := s.state[label]
+			if !ok {
+				errors = append(errors, fmt.Sprintf("event[%d] (%q): unknown label", i, rawLabel))
+				continue
+			}
+			itemMap, _ := evt["item"].(map[string]any)
+			newItem, err := ItemFromMap(itemMap)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("event[%d] (%q): %v", i, rawLabel, err))
+				continue
+			}
+			newItem.Label = label
+			rawPaths, _ := evt["paths"].([]any)
+			paths := make([]string, 0, len(rawPaths))
+			for _, p := range rawPaths {
+				if ps, ok := p.(string); ok {
+					paths = append(paths, ps)
+				}
+			}
+			st.Item = newItem
+			basePose := newItem.Pose
+			if basePose.OX == 0 && basePose.OY == 0 && basePose.OZ == 0 {
+				basePose.OZ = 1.0
+			}
+			st.BasePose = basePose
+			st.BaseGeom = s.Hooks.BaseGeomForItem(newItem)
+			geom, err := s.Hooks.BuildGeometry(newItem, st.BaseGeom)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("event[%d] (%q): build geom: %v", i, rawLabel, err))
+				continue
+			}
+			tf, err := s.buildTransform(newItem, basePose, geom, st.UUID, nil)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("event[%d] (%q): build transform: %v", i, rawLabel, err))
+				continue
+			}
+			st.Transform = tf
+			s.broadcastLocked(worldstatestore.TransformChange{
+				ChangeType:    wsspb.TransformChangeType_TRANSFORM_CHANGE_TYPE_UPDATED,
+				Transform:     tf,
+				UpdatedFields: paths,
+			})
+			updated++
+
+		case "removed":
+			st, ok := s.state[label]
+			if !ok {
+				continue // idempotent
+			}
+			delete(s.state, label)
+			s.broadcastLocked(worldstatestore.TransformChange{
+				ChangeType: wsspb.TransformChangeType_TRANSFORM_CHANGE_TYPE_REMOVED,
+				Transform:  st.Transform,
+			})
+			removed++
+
+		default:
+			errors = append(errors, fmt.Sprintf("event[%d] (%q): unknown kind %q", i, rawLabel, kind))
+		}
+	}
+	return map[string]any{
+		"applied": added + updated + removed,
+		"added":   added,
+		"updated": updated,
+		"removed": removed,
+		"errors":  errors,
 	}, nil
 }
 
