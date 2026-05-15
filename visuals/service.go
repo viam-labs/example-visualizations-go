@@ -722,12 +722,48 @@ func (s *SceneServiceBase) DoCommand(ctx context.Context, command map[string]any
 	}, nil
 }
 
+// coerceEventsSlice normalizes the events payload. May arrive as
+// []map[string]any (in-process Go: what EventsToWire emits) or as
+// []any (cross-process gRPC via structpb).
+func coerceEventsSlice(v any) []any {
+	switch tv := v.(type) {
+	case []map[string]any:
+		out := make([]any, len(tv))
+		for i, m := range tv {
+			out[i] = m
+		}
+		return out
+	case []any:
+		return tv
+	}
+	return nil
+}
+
+// coerceStringSlice extracts a []string from a map value that may be
+// typed []string (in-process Go), []any-of-string (gRPC via structpb),
+// or nil/missing. Anything else returns nil.
+func coerceStringSlice(v any) []string {
+	switch tv := v.(type) {
+	case []string:
+		return tv
+	case []any:
+		out := make([]string, 0, len(tv))
+		for _, x := range tv {
+			if s, ok := x.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
+}
+
 // applyEvents handles the apply_events DoCommand verb — the batched
 // wire-format input the driver→visualizer pipeline sends. Mirrors
 // the Python implementation. Errors are recorded per-event so a
 // single bad event doesn't abort the batch.
 func (s *SceneServiceBase) applyEvents(command map[string]any) (map[string]any, error) {
-	rawEvents, _ := command["events"].([]any)
+	rawEvents := coerceEventsSlice(command["events"])
 	namespace, _ := command["namespace"].(string)
 	prefix := ""
 	if namespace != "" {
@@ -789,13 +825,10 @@ func (s *SceneServiceBase) applyEvents(command map[string]any) (map[string]any, 
 				continue
 			}
 			newItem.Label = label
-			rawPaths, _ := evt["paths"].([]any)
-			paths := make([]string, 0, len(rawPaths))
-			for _, p := range rawPaths {
-				if ps, ok := p.(string); ok {
-					paths = append(paths, ps)
-				}
-			}
+			// "paths" may arrive as []string (in-process Go→Go call)
+			// or []any (cross-process gRPC where structpb erases the
+			// concrete element type). Handle both.
+			paths := coerceStringSlice(evt["paths"])
 			st.Item = newItem
 			basePose := newItem.Pose
 			if basePose.OX == 0 && basePose.OY == 0 && basePose.OZ == 0 {

@@ -4,9 +4,18 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	commonpb "go.viam.com/api/common/v1"
+	"go.viam.com/rdk/services/worldstatestore"
 )
+
+// Aliases for the regression test helpers below.
+type worldstatestoreChangeForTest = worldstatestore.TransformChange
+
+func asWSChan(ch chan worldstatestore.TransformChange) chan worldstatestore.TransformChange {
+	return ch
+}
 
 // ---- test helpers -----------------------------------------------------
 
@@ -221,6 +230,97 @@ func TestApplyEvents_UnknownKind(t *testing.T) {
 }
 
 // ---- round trip --------------------------------------------------------
+
+// Regression: in-process Go→Go driver calls produce []string for
+// paths (not []any). The visualizer must extract them as paths or
+// the renderer sees UPDATED events with empty UpdatedFields and
+// the boxes don't animate. (Found on dell-2 deploy of v0.0.11.)
+func TestApplyEvents_PathsAsStringSliceInProcessRoundTrip(t *testing.T) {
+	s := newBareService(t)
+	_, _ = s.DoCommand(context.Background(), map[string]any{
+		"command": "apply_events",
+		"events": []any{
+			map[string]any{"kind": "added", "label": "b1", "item": boxMap("b1")},
+		},
+	})
+
+	// Capture broadcasts to assert UpdatedFields is non-empty.
+	captured := make(chan struct {
+		Paths []string
+		Kind  string
+	}, 4)
+	s.mu.Lock()
+	ch := make(chan worldstatestoreChangeForTest, 256)
+	s.subscribers = append(s.subscribers, asWSChan(ch))
+	s.mu.Unlock()
+	go func() {
+		for c := range ch {
+			captured <- struct {
+				Paths []string
+				Kind  string
+			}{Paths: c.UpdatedFields, Kind: c.ChangeType.String()}
+		}
+	}()
+
+	// Send an UPDATED event with paths typed as []string — the exact
+	// shape the driver-side EventsToWire produces.
+	newItem := boxMap("b1")
+	newItem["pose"].(map[string]any)["x"] = 200.0
+	_, _ = s.DoCommand(context.Background(), map[string]any{
+		"command": "apply_events",
+		"events": []any{
+			map[string]any{
+				"kind":  "updated",
+				"label": "b1",
+				"item":  newItem,
+				"paths": []string{"poseInObserverFrame.pose.x"}, // <-- []string, not []any
+			},
+		},
+	})
+
+	// Drain captured events until we see the UPDATED.
+	deadline := time.After(100 * time.Millisecond)
+	var got struct {
+		Paths []string
+		Kind  string
+	}
+	for {
+		select {
+		case ev := <-captured:
+			if ev.Kind == "TRANSFORM_CHANGE_TYPE_UPDATED" {
+				got = ev
+				goto done
+			}
+		case <-deadline:
+			t.Fatal("never saw UPDATED event")
+		}
+	}
+done:
+	if len(got.Paths) != 1 || got.Paths[0] != "poseInObserverFrame.pose.x" {
+		t.Errorf("UPDATED with empty/wrong paths (would silently skip in renderer): %v", got.Paths)
+	}
+}
+
+// Regression: same as above but for the events list itself — driver
+// emits []map[string]any directly, not []any. Visualizer must accept
+// both shapes.
+func TestApplyEvents_EventsListAsMapSlice(t *testing.T) {
+	s := newBareService(t)
+	// Pass events as []map[string]any (what EventsToWire returns).
+	wire := []map[string]any{
+		{"kind": "added", "label": "b1", "item": boxMap("b1")},
+	}
+	result, err := s.DoCommand(context.Background(), map[string]any{
+		"command": "apply_events",
+		"events":  wire,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result["added"] != 1 {
+		t.Errorf("expected added=1, got %v (events shape rejection?)", result["added"])
+	}
+}
 
 func TestApplyEvents_SceneRoundTrip(t *testing.T) {
 	scene := NewScene("world")
