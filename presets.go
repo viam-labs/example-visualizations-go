@@ -237,26 +237,15 @@ func orientationVectorsPreset() []Item {
 func referenceFrameDemo() []Item {
 	const axisLength = 200.0
 	const axisRadius = 12.0
-	half := axisLength / 2.0
-	visuals := []Visual{
-		// Anchor — spins around Z; children inherit.
-		Sphere{Label: "spinning_frame", Pose: identityPose(),
-			RadiusMM: 12, Color: &Color{R: 255, G: 255, B: 255},
-			Opacity: ptr(0.6), ShowAxesHelper: true,
-			Animation: Spin{PeriodS: 6}},
-		// RGB axis triad — three capsules parented to anchor.
-		Capsule{Label: "spinning_frame_axis_x", ParentFrame: "spinning_frame",
-			Pose: PoseAt(half, 0, 0, 1, 0, 0, 0),
-			RadiusMM: axisRadius, LengthMM: axisLength,
-			Color: &Color{R: 230, G: 25, B: 75}, Opacity: ptr(1.0)},
-		Capsule{Label: "spinning_frame_axis_y", ParentFrame: "spinning_frame",
-			Pose: PoseAt(0, half, 0, 0, 1, 0, 0),
-			RadiusMM: axisRadius, LengthMM: axisLength,
-			Color: &Color{R: 60, G: 180, B: 75}, Opacity: ptr(1.0)},
-		Capsule{Label: "spinning_frame_axis_z", ParentFrame: "spinning_frame",
-			Pose: PoseAt(0, 0, half, 0, 0, 1, 0),
-			RadiusMM: axisRadius, LengthMM: axisLength,
-			Color: &Color{R: 0, G: 130, B: 200}, Opacity: ptr(1.0)},
+	// Anchor + RGB axes triad — single composite. The anchor spins;
+	// the axes inherit motion through the parent-frame chain.
+	frame := CoordinateFrame{
+		Label: "spinning_frame", Pose: identityPose(),
+		SizeMM: axisLength, AxisRadiusMM: axisRadius, AnchorRadiusMM: 12,
+		ShowAxesHelper: true, Animation: Spin{PeriodS: 6},
+	}
+	visuals := append([]Visual{}, frame.ToVisuals()...)
+	visuals = append(visuals, []Visual{
 		// Mesh — orbits with anchor AND spins on its own axis.
 		Mesh{Label: "spinning_frame_attached_mesh", ParentFrame: "spinning_frame",
 			Pose: PoseAt(700, 0, 0, 0, 0, 1, 0),
@@ -274,7 +263,7 @@ func referenceFrameDemo() []Item {
 			Color:       &Color{R: 255, G: 255, B: 255},
 			Opacity:     ptr(0.0),
 			Animation:   Spin{PeriodS: 10}},
-	}
+	}...)
 	for _, sv := range colorWheelChildrenVisuals("spinning_frame_wheel_hub", 10, 220.0, 24.0) {
 		visuals = append(visuals, sv)
 	}
@@ -395,22 +384,11 @@ func trajectoryPreviewPreset() []Item {
 			Opacity: ptr(0.45), ShowAxesHelper: true,
 		})
 	}
-	for i := 0; i < len(waypoints)-1; i++ {
-		a := waypoints[i]
-		b := waypoints[i+1]
-		dx, dy, dz := b.X-a.X, b.Y-a.Y, b.Z-a.Z
-		segLen := math.Sqrt(dx*dx + dy*dy + dz*dz)
-		if segLen < 1e-6 {
-			continue
-		}
-		visuals = append(visuals, Capsule{
-			Label: fmt.Sprintf("traj_seg_%02d", i),
-			Pose: PoseAt((a.X+b.X)/2, (a.Y+b.Y)/2, (a.Z+b.Z)/2,
-				dx/segLen, dy/segLen, dz/segLen, 0),
-			RadiusMM: 5, LengthMM: segLen,
-			Color: &Color{R: 100, G: 130, B: 240}, Opacity: ptr(0.95),
-		})
-	}
+	// Polyline as a capsule chain via the Line composite.
+	visuals = append(visuals, Line{
+		LabelPrefix: "traj", Points: waypoints, WidthMM: 10,
+		Color: &Color{R: 100, G: 130, B: 240}, Opacity: ptr(0.95),
+	}.ToVisuals()...)
 	visuals = append(visuals, Sphere{
 		Label: "traj_runner", Pose: waypoints[0],
 		RadiusMM: 28, Color: &Color{R: 230, G: 40, B: 80},

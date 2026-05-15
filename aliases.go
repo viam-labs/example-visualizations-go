@@ -53,6 +53,15 @@ type (
 	Lifecycle     = visuals.Lifecycle
 	ForceVector   = visuals.ForceVector
 	Trajectory    = visuals.Trajectory
+	// Composites.
+	Composite       = visuals.Composite
+	CoordinateFrame = visuals.CoordinateFrame
+	Line            = visuals.Line
+	BoundingBox     = visuals.BoundingBox
+)
+
+var (
+	ArrowFromTo = visuals.ArrowFromTo
 )
 
 // Re-exported lifecycle convention.
