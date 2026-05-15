@@ -11,7 +11,9 @@
 package exampleviz
 
 import (
+	"fmt"
 	"math"
+	"strings"
 
 	"exampleviz/visuals"
 )
@@ -291,13 +293,406 @@ func detectionLabel(i int) string {
 	return "det_" + string(rune('0'+i))
 }
 
+// ---- coordinate_frames_arm --------------------------------------------
+
+// CoordinateFramesArm — three spinning coordinate-frame triads + an
+// articulated arm. Demonstrates composite expansion (CoordinateFrame
+// → 4 visuals) and chained parent_frame propagation (each arm link
+// parents to the previous link's label).
+//
+// All animation is computed client-side: only joint angles change
+// per tick. The static parent-frame offsets stay fixed.
+type CoordinateFramesArm struct{}
+
+func (CoordinateFramesArm) Name() string { return "coordinate_frames_arm" }
+
+const (
+	cfFrameY      = 600.0
+	cfFrameSizeMM = 120.0
+	cfArmBaseX    = -800.0
+	cfArmBaseY    = -400.0
+	cfArmBaseZ    = 0.0
+	cfLinkLength  = 200.0
+	cfShoulderAmp = 50.0
+	cfShoulderPer = 4.5
+	cfElbowAmp    = 60.0
+	cfElbowPer    = 3.2
+	cfWristAmp    = 90.0
+	cfWristPer    = 2.6
+)
+
+var cfFrameXs = []float64{-400, 0, 400}
+var cfFramePeriods = []float64{4.0, 5.5, 7.0}
+
+func (CoordinateFramesArm) Initial(scene *visuals.Scene) []visuals.SceneEvent {
+	out := []visuals.SceneEvent{}
+
+	// Three coordinate-frame triads.
+	for i, x := range cfFrameXs {
+		frame := visuals.CoordinateFrame{
+			Label:  fmt.Sprintf("frame_%d", i),
+			Pose:   visuals.Pose{X: x, Y: cfFrameY, Z: 200},
+			SizeMM: cfFrameSizeMM,
+		}
+		events, err := scene.Add(frame)
+		if err == nil {
+			out = append(out, events...)
+		}
+	}
+
+	// Articulated arm: each link parents to the prior link's label.
+	gray := visuals.Color{R: 120, G: 120, B: 120}
+	red := visuals.Color{R: 230, G: 100, B: 100}
+	green := visuals.Color{R: 100, G: 230, B: 100}
+	blue := visuals.Color{R: 100, G: 100, B: 230}
+	yellow := visuals.Color{R: 230, G: 230, B: 100}
+	L := cfLinkLength
+
+	armItems := []interface{}{
+		&visuals.Sphere{
+			Label:    "arm_shoulder",
+			Pose:     visuals.Pose{X: cfArmBaseX, Y: cfArmBaseY, Z: cfArmBaseZ},
+			RadiusMM: 45, Color: &gray,
+		},
+		&visuals.Capsule{
+			Label:       "arm_upper",
+			ParentFrame: "arm_shoulder",
+			Pose:        visuals.Pose{Z: L / 2},
+			RadiusMM:    28, LengthMM: L, Color: &red,
+		},
+		&visuals.Sphere{
+			Label:       "arm_elbow",
+			ParentFrame: "arm_upper",
+			Pose:        visuals.Pose{Z: L / 2},
+			RadiusMM:    36, Color: &green,
+		},
+		&visuals.Capsule{
+			Label:       "arm_forearm",
+			ParentFrame: "arm_elbow",
+			Pose:        visuals.Pose{Z: L / 2},
+			RadiusMM:    22, LengthMM: L, Color: &blue,
+		},
+		&visuals.Sphere{
+			Label:       "arm_wrist",
+			ParentFrame: "arm_forearm",
+			Pose:        visuals.Pose{Z: L / 2},
+			RadiusMM:    28, Color: &yellow,
+		},
+	}
+	events, err := scene.Add(armItems...)
+	if err == nil {
+		out = append(out, events...)
+	}
+	return out
+}
+
+func (CoordinateFramesArm) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+	out := []visuals.SceneEvent{}
+	gray := visuals.Color{R: 120, G: 120, B: 120}
+	green := visuals.Color{R: 100, G: 230, B: 100}
+	yellow := visuals.Color{R: 230, G: 230, B: 100}
+
+	// Rebuild each composite/joint with the new pose every tick.
+	// scene.AddOrUpdate handles composite expansion and per-label
+	// diffing — only the changed labels produce UPDATED events.
+	// (Scene.Get + type-assert against the stored type doesn't
+	// generalize across value-stored composites vs pointer-stored
+	// arm pointers; AddOrUpdate keeps the code uniform.)
+
+	for i, x := range cfFrameXs {
+		theta := math.Mod(360.0*t/cfFramePeriods[i], 360.0)
+		frame := visuals.CoordinateFrame{
+			Label:  fmt.Sprintf("frame_%d", i),
+			Pose:   visuals.Pose{X: x, Y: cfFrameY, Z: 200, Theta: theta},
+			SizeMM: cfFrameSizeMM,
+		}
+		if events, err := scene.AddOrUpdate(frame); err == nil {
+			out = append(out, events...)
+		}
+	}
+
+	shoulderTheta := cfShoulderAmp * math.Sin(2*math.Pi*t/cfShoulderPer)
+	shoulder := &visuals.Sphere{
+		Label: "arm_shoulder",
+		Pose: visuals.Pose{
+			X: cfArmBaseX, Y: cfArmBaseY, Z: cfArmBaseZ,
+			OY: 1, Theta: shoulderTheta,
+		},
+		RadiusMM: 45, Color: &gray,
+	}
+	if events, err := scene.AddOrUpdate(shoulder); err == nil {
+		out = append(out, events...)
+	}
+
+	elbowTheta := cfElbowAmp * math.Sin(2*math.Pi*t/cfElbowPer+0.7)
+	elbow := &visuals.Sphere{
+		Label:       "arm_elbow",
+		ParentFrame: "arm_upper",
+		Pose:        visuals.Pose{Z: cfLinkLength / 2, OY: 1, Theta: elbowTheta},
+		RadiusMM:    36, Color: &green,
+	}
+	if events, err := scene.AddOrUpdate(elbow); err == nil {
+		out = append(out, events...)
+	}
+
+	wristTheta := cfWristAmp * math.Sin(2*math.Pi*t/cfWristPer)
+	wrist := &visuals.Sphere{
+		Label:       "arm_wrist",
+		ParentFrame: "arm_forearm",
+		Pose:        visuals.Pose{Z: cfLinkLength / 2, Theta: wristTheta},
+		RadiusMM:    28, Color: &yellow,
+	}
+	if events, err := scene.AddOrUpdate(wrist); err == nil {
+		out = append(out, events...)
+	}
+
+	return out
+}
+
+// ---- trajectory_runner ------------------------------------------------
+
+// TrajectoryRunner — a "runner" sphere walking through a list of
+// waypoints with linear interpolation. The waypoints and the line
+// connecting them are static; only the runner's pose changes per tick.
+type TrajectoryRunner struct{}
+
+func (TrajectoryRunner) Name() string { return "trajectory_runner" }
+
+const (
+	trLapPeriodS = 8.0
+)
+
+var trWaypoints = []visuals.Pose{
+	{X: -400, Y: -300, Z: 100, OZ: 1},
+	{X: -200, Y: -150, Z: 200, OZ: 1},
+	{X: 0, Y: 0, Z: 300, OZ: 1},
+	{X: 200, Y: 150, Z: 200, OZ: 1},
+	{X: 400, Y: 300, Z: 100, OZ: 1},
+}
+
+func (TrajectoryRunner) Initial(scene *visuals.Scene) []visuals.SceneEvent {
+	out := []visuals.SceneEvent{}
+
+	// Translucent static waypoint markers.
+	wpColor := visuals.Color{R: 120, G: 180, B: 220}
+	wpOpacity := 0.4
+	for i, wp := range trWaypoints {
+		marker := &visuals.Sphere{
+			Label:    fmt.Sprintf("wp_%d", i),
+			Pose:     wp,
+			RadiusMM: 30, Color: &wpColor, Opacity: &wpOpacity,
+		}
+		if events, err := scene.Add(marker); err == nil {
+			out = append(out, events...)
+		}
+	}
+
+	// Path line connecting the waypoints.
+	lineColor := visuals.Color{R: 120, G: 180, B: 220}
+	lineOpacity := 0.5
+	line := visuals.Line{
+		LabelPrefix: "trajectory",
+		Points:      append([]visuals.Pose(nil), trWaypoints...),
+		WidthMM:     6,
+		Color:       &lineColor,
+		Opacity:     &lineOpacity,
+	}
+	if events, err := scene.Add(line); err == nil {
+		out = append(out, events...)
+	}
+
+	// The runner — brighter and larger, with axes helper.
+	runnerColor := visuals.Color{R: 255, G: 200, B: 50}
+	runner := &visuals.Sphere{
+		Label:          "trajectory_runner",
+		Pose:           trWaypoints[0],
+		RadiusMM:       55,
+		Color:          &runnerColor,
+		ShowAxesHelper: true,
+	}
+	if events, err := scene.Add(runner); err == nil {
+		out = append(out, events...)
+	}
+	return out
+}
+
+func (TrajectoryRunner) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+	n := len(trWaypoints)
+	nSegs := n // LOOP=true: wrap back to wp 0
+	progress := math.Mod(t/trLapPeriodS*float64(nSegs), float64(nSegs))
+	segIdx := int(progress)
+	local := progress - float64(segIdx)
+	a := trWaypoints[segIdx]
+	b := trWaypoints[(segIdx+1)%n]
+
+	runnerColor := visuals.Color{R: 255, G: 200, B: 50}
+	runner := &visuals.Sphere{
+		Label: "trajectory_runner",
+		Pose: visuals.Pose{
+			X:  a.X + (b.X-a.X)*local,
+			Y:  a.Y + (b.Y-a.Y)*local,
+			Z:  a.Z + (b.Z-a.Z)*local,
+			OZ: 1,
+		},
+		RadiusMM:       55,
+		Color:          &runnerColor,
+		ShowAxesHelper: true,
+	}
+	events, _ := scene.AddOrUpdate(runner)
+	return events
+}
+
+// ---- lifecycle_garden -------------------------------------------------
+
+// LifecycleGarden — N "plots" cycling through appear → alive →
+// disappear → gone phases at staggered offsets. Demonstrates
+// scene-graph mutation from a recipe (ADD / UPDATE / REMOVE) and
+// the renderer's REMOVED-UUID cache workaround (each cycle uses a
+// fresh label, so the visualizer's stable-strategy UUID differs
+// from prior cycles).
+//
+// Uses a pointer receiver because the per-plot version counter
+// needs to mutate across tick calls.
+type LifecycleGarden struct {
+	version [lgNPlots]int
+}
+
+func (lg *LifecycleGarden) Name() string { return "lifecycle_garden" }
+
+const (
+	lgNPlots        = 5
+	lgPlotSpacingMM = 250.0
+	lgAppearS       = 0.8
+	lgAliveS        = 1.6
+	lgDisappearS    = 0.8
+	lgGoneS         = 0.8
+	lgCycleS        = lgAppearS + lgAliveS + lgDisappearS + lgGoneS
+)
+
+var (
+	lgColorAppear    = visuals.Color{R: 50, G: 110, B: 220}
+	lgColorAlive     = visuals.Color{R: 255, G: 165, B: 0}
+	lgColorDisappear = visuals.Color{R: 220, G: 60, B: 60}
+)
+
+func (lg *LifecycleGarden) Initial(scene *visuals.Scene) []visuals.SceneEvent {
+	return nil // all plots start gone; tick handles add/update.
+}
+
+func (lg *LifecycleGarden) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+	out := []visuals.SceneEvent{}
+	for i := 0; i < lgNPlots; i++ {
+		phaseOffset := (lgCycleS / float64(lgNPlots)) * float64(i)
+		localT := math.Mod(t+phaseOffset, lgCycleS)
+		phase, _ := lg.phaseFor(localT)
+
+		// Find current label for this plot (any version) in the scene.
+		prefix := fmt.Sprintf("garden_%d_v", i)
+		var current string
+		for _, lab := range scene.Labels() {
+			if strings.HasPrefix(lab, prefix) {
+				current = lab
+				break
+			}
+		}
+
+		if phase == "gone" {
+			if current != "" {
+				if events := scene.Remove(current); len(events) > 0 {
+					out = append(out, events...)
+				}
+			}
+			continue
+		}
+
+		color := lg.colorFor(phase)
+		opacity := lg.opacityFor(phase)
+		x := (float64(i) - float64(lgNPlots-1)/2.0) * lgPlotSpacingMM
+
+		if current == "" {
+			// Fresh cycle — bump version, use a new label.
+			lg.version[i]++
+			box := &visuals.Box{
+				Label:   fmt.Sprintf("garden_%d_v%d", i, lg.version[i]),
+				Pose:    visuals.Pose{X: x, Z: 100},
+				DimsMM:  visuals.BoxDims{X: 140, Y: 140, Z: 140},
+				Color:   &color,
+				Opacity: &opacity,
+			}
+			if events, err := scene.Add(box); err == nil {
+				out = append(out, events...)
+			}
+			continue
+		}
+
+		// Update existing plot — color/opacity change.
+		v := scene.Get(current)
+		if v == nil {
+			continue
+		}
+		box, ok := v.(*visuals.Box)
+		if !ok {
+			continue
+		}
+		box.Color = &color
+		box.Opacity = &opacity
+		if events, err := scene.Update(box); err == nil {
+			out = append(out, events...)
+		}
+	}
+	return out
+}
+
+func (lg *LifecycleGarden) phaseFor(localT float64) (string, float64) {
+	if localT < lgAppearS {
+		return "appear", localT / lgAppearS
+	}
+	localT -= lgAppearS
+	if localT < lgAliveS {
+		return "alive", localT / lgAliveS
+	}
+	localT -= lgAliveS
+	if localT < lgDisappearS {
+		return "disappear", localT / lgDisappearS
+	}
+	localT -= lgDisappearS
+	return "gone", localT / lgGoneS
+}
+
+func (lg *LifecycleGarden) colorFor(phase string) visuals.Color {
+	switch phase {
+	case "appear":
+		return lgColorAppear
+	case "alive":
+		return lgColorAlive
+	case "disappear":
+		return lgColorDisappear
+	}
+	return visuals.Color{R: 255, G: 255, B: 255}
+}
+
+func (lg *LifecycleGarden) opacityFor(phase string) float64 {
+	switch phase {
+	case "appear":
+		return 0.5
+	case "alive":
+		return 1.0
+	case "disappear":
+		return 0.5
+	}
+	return 0.0
+}
+
 // ---- registry ----------------------------------------------------------
 
 var Recipes = map[string]Recipe{
-	(MarchingBoxes{}).Name():     MarchingBoxes{},
-	(PulsingSpheres{}).Name():    PulsingSpheres{},
-	(AllPrimitives{}).Name():     AllPrimitives{},
-	(DetectionsOverlay{}).Name(): DetectionsOverlay{},
+	(MarchingBoxes{}).Name():       MarchingBoxes{},
+	(PulsingSpheres{}).Name():      PulsingSpheres{},
+	(AllPrimitives{}).Name():       AllPrimitives{},
+	(DetectionsOverlay{}).Name():   DetectionsOverlay{},
+	(CoordinateFramesArm{}).Name(): CoordinateFramesArm{},
+	(TrajectoryRunner{}).Name():    TrajectoryRunner{},
+	(&LifecycleGarden{}).Name():    &LifecycleGarden{},
 }
 
 // ---- helpers -----------------------------------------------------------
