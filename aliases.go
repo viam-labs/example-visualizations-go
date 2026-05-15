@@ -13,12 +13,14 @@ package exampleviz
 import "exampleviz/visuals"
 
 type (
-	Pose      = visuals.Pose
-	Color     = visuals.Color
-	BoxDims   = visuals.BoxDims
-	Item      = visuals.Item
-	Animation = visuals.Animation
-	Overrides = visuals.Overrides
+	Pose       = visuals.Pose
+	Color      = visuals.Color
+	BoxDims    = visuals.BoxDims
+	Item       = visuals.Item
+	Animation  = visuals.Animation
+	Overrides  = visuals.Overrides
+	BaseGeom   = visuals.BaseGeom
+	TickResult = visuals.TickResult
 )
 
 // Re-exported constants / functions (forward declarations so that

@@ -105,6 +105,28 @@ type Overrides struct {
 	InScene *bool // nil = no scene-graph mutation; ptr = explicit in_scene
 }
 
+// BaseGeom holds the shape-specific base dim/radius/length fields.
+// Only one set of fields is meaningful per shape type. The
+// PCDBytesOverride field is a service-layer escape hatch for
+// chunked delivery: when non-nil, the geometry builder for
+// pointcloud items emits these bytes instead of reading the file
+// fresh.
+type BaseGeom struct {
+	RadiusMM         float64
+	LengthMM         float64
+	Dims             BoxDims
+	HasDims          bool
+	PCDBytesOverride []byte
+}
+
+// TickResult is what an Animation tick function returns.
+type TickResult struct {
+	Pose      Pose
+	Geom      BaseGeom
+	Paths     []string
+	Overrides *Overrides
+}
+
 // ---- AnimationSpec interface + concrete types --------------------------
 //
 // The Animation struct above is the union of all per-mode params —

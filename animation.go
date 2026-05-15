@@ -22,26 +22,8 @@ import (
 // that consumes them. See aliases.go for the unqualified re-exports
 // that keep the rest of the package's references working.
 
-// BaseGeom holds the shape-specific base dim/radius/length fields.
-// Only one set of fields is meaningful per shape type. The
-// pcdBytesOverride field is a service-layer escape hatch for chunked
-// delivery: when non-nil, the geometry builder for pointcloud items
-// emits these bytes instead of reading the file fresh.
-type BaseGeom struct {
-	RadiusMM         float64
-	LengthMM         float64
-	Dims             BoxDims
-	HasDims          bool
-	pcdBytesOverride []byte
-}
-
-// TickResult is what ComputeTick returns.
-type TickResult struct {
-	Pose      Pose
-	Geom      BaseGeom
-	Paths     []string
-	Overrides *Overrides
-}
+// BaseGeom + TickResult moved to viam-visuals visuals package; the
+// aliases in aliases.go re-export them under the unqualified names.
 
 // ComputeTick is the pure per-tick animation function. Given an item
 // (whose Type and Animation are read), base pose, base geometry,
