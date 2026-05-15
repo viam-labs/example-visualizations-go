@@ -142,11 +142,162 @@ func pulsingLabel(i int) string {
 	return "pulse_" + string(rune('0'+i))
 }
 
+// ---- all_primitives ----------------------------------------------------
+
+// AllPrimitives — one of every supported shape, static.
+//
+// Driver-side equivalent of the standalone-playground "primitives"
+// preset. Useful as the "what can I put in a Scene" reference: each
+// shape type appears in a row along X. Static — the driver pushes
+// ADDED events on startup and nothing thereafter.
+//
+// Note that Mesh and PointCloud items reference asset paths that
+// the *visualizer* resolves at install time. As long as the driver
+// and visualizer ship from the same module binary (the default with
+// the in-process registry), the visualizer's ReadAsset hook finds
+// the assets in the module's installed directory.
+type AllPrimitives struct{}
+
+func (AllPrimitives) Name() string { return "all_primitives" }
+
+const apSpacing = 280.0
+
+func (AllPrimitives) Initial(scene *visuals.Scene) []visuals.SceneEvent {
+	z := 100.0
+	red := visuals.Color{R: 230, G: 25, B: 75}
+	green := visuals.Color{R: 60, G: 180, B: 75}
+	blue := visuals.Color{R: 0, G: 130, B: 200}
+	orange := visuals.Color{R: 245, G: 130, B: 48}
+	purple := visuals.Color{R: 145, G: 30, B: 180}
+	cyan := visuals.Color{R: 70, G: 240, B: 240}
+
+	items := []interface{}{
+		&visuals.Box{
+			Label:  "demo_box",
+			Pose:   visuals.Pose{X: -3 * apSpacing, Z: z},
+			DimsMM: visuals.BoxDims{X: 140, Y: 140, Z: 140},
+			Color:  &red,
+		},
+		&visuals.Sphere{
+			Label:    "demo_sphere",
+			Pose:     visuals.Pose{X: -2 * apSpacing, Z: z},
+			RadiusMM: 80,
+			Color:    &green,
+		},
+		&visuals.Capsule{
+			Label:    "demo_capsule",
+			Pose:     visuals.Pose{X: -1 * apSpacing, Z: z},
+			RadiusMM: 40,
+			LengthMM: 200,
+			Color:    &blue,
+		},
+		&visuals.Point{
+			Label: "demo_point",
+			Pose:  visuals.Pose{Z: z},
+			Color: &orange,
+		},
+		&visuals.Arrow{
+			Label:    "demo_arrow",
+			Pose:     visuals.Pose{X: 1 * apSpacing, Z: z},
+			LengthMM: 240,
+			RadiusMM: 20,
+			Color:    &purple,
+		},
+		&visuals.Mesh{
+			Label:    "demo_bunny",
+			Pose:     visuals.Pose{X: 2 * apSpacing, Z: z},
+			MeshPath: "assets/bunny.stl",
+			Color:    &cyan,
+		},
+		&visuals.PointCloud{
+			Label:          "demo_pcd",
+			Pose:           visuals.Pose{X: 3 * apSpacing, Z: z},
+			PointcloudPath: "assets/helix.pcd",
+		},
+	}
+	events, _ := scene.Add(items...)
+	return events
+}
+
+func (AllPrimitives) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+	return nil // static
+}
+
+// ---- detections_overlay ------------------------------------------------
+
+// DetectionsOverlay — simulated object-detection overlay: N solid
+// translucent bounding boxes drifting around the origin.
+//
+// This is the canonical driver-shaped use case — a perception
+// module produces detections every tick and the visualizer
+// publishes them to the renderer. The recipe stands in for the
+// real detector by walking N synthetic detections on phase-offset
+// circular paths.
+//
+// Uses visuals.BoundingBox with Wireframe=false (a single solid
+// Box per detection). The translucent opacity keeps the underlying
+// scene visible through the overlay, mirroring how most perception
+// output is rendered (YOLO, Google Cloud Vision, etc.).
+//
+// Note: BoundingBox{Wireframe: true} expands into 12 capsule edges
+// positioned via ParentFrame chaining, but doesn't honor the
+// composite's Pose directly today. Solid is the right choice here;
+// wireframe is a future direction once an anchor-frame pattern is
+// wired into the recipe.
+type DetectionsOverlay struct{}
+
+func (DetectionsOverlay) Name() string { return "detections_overlay" }
+
+const (
+	doDetections    = 4
+	doOrbitRadiusMM = 500.0
+	doOrbitPeriodS  = 8.0
+)
+
+var doBoxDims = visuals.BoxDims{X: 140, Y: 100, Z: 120}
+
+func (DetectionsOverlay) Initial(scene *visuals.Scene) []visuals.SceneEvent {
+	// Detections appear on first tick — returning nothing here keeps
+	// the initial-burst broadcast clean.
+	return nil
+}
+
+func (DetectionsOverlay) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+	out := []visuals.SceneEvent{}
+	for i := 0; i < doDetections; i++ {
+		phase := 2 * math.Pi * float64(i) / float64(doDetections)
+		angle := 2*math.Pi*t/doOrbitPeriodS + phase
+		x := doOrbitRadiusMM * math.Cos(angle)
+		y := doOrbitRadiusMM * math.Sin(angle)
+		z := 200.0
+		c := rainbow(float64(i) / float64(doDetections))
+		opacity := 0.4
+		bbox := visuals.BoundingBox{
+			Label:   detectionLabel(i),
+			Pose:    visuals.Pose{X: x, Y: y, Z: z},
+			DimsMM:  doBoxDims,
+			Color:   &c,
+			Opacity: &opacity,
+		}
+		events, err := scene.AddOrUpdate(bbox)
+		if err == nil {
+			out = append(out, events...)
+		}
+	}
+	return out
+}
+
+func detectionLabel(i int) string {
+	return "det_" + string(rune('0'+i))
+}
+
 // ---- registry ----------------------------------------------------------
 
 var Recipes = map[string]Recipe{
-	(MarchingBoxes{}).Name():  MarchingBoxes{},
-	(PulsingSpheres{}).Name(): PulsingSpheres{},
+	(MarchingBoxes{}).Name():     MarchingBoxes{},
+	(PulsingSpheres{}).Name():    PulsingSpheres{},
+	(AllPrimitives{}).Name():     AllPrimitives{},
+	(DetectionsOverlay{}).Name(): DetectionsOverlay{},
 }
 
 // ---- helpers -----------------------------------------------------------
