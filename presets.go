@@ -146,143 +146,65 @@ func poseAt(x, y, z float64) Pose   { return Pose{X: x, Y: y, Z: z, OZ: 1.0} }
 
 func primitivesPreset() []Item {
 	sp := PrimitiveRowSpacingMM
-	return []Item{
-		{
-			Type: "box", Label: "demo_box",
-			Pose: poseAt(-4*sp, 0, 0), HasDims: true,
-			DimsMM:  BoxDims{X: 150, Y: 150, Z: 150},
-			Color:   &Color{R: 230, G: 25, B: 75},
-			Opacity: ptr(1.0),
-		},
-		{
-			Type: "sphere", Label: "demo_sphere",
-			Pose:     poseAt(-3*sp, 0, 0),
-			RadiusMM: 90,
-			Color:    &Color{R: 60, G: 180, B: 75},
-			Opacity:  ptr(1.0),
-		},
-		{
-			Type: "capsule", Label: "demo_capsule",
-			Pose:     poseAt(-2*sp, 0, 0),
+	return ToItems(
+		Box{Label: "demo_box", Pose: poseAt(-4*sp, 0, 0),
+			DimsMM: BoxDims{X: 150, Y: 150, Z: 150},
+			Color: &Color{R: 230, G: 25, B: 75}, Opacity: ptr(1.0)},
+		Sphere{Label: "demo_sphere", Pose: poseAt(-3*sp, 0, 0),
+			RadiusMM: 90, Color: &Color{R: 60, G: 180, B: 75}, Opacity: ptr(1.0)},
+		Capsule{Label: "demo_capsule", Pose: poseAt(-2*sp, 0, 0),
 			RadiusMM: 50, LengthMM: 200,
-			Color:   &Color{R: 0, G: 130, B: 200},
-			Opacity: ptr(1.0),
-		},
-		{
-			Type: "point", Label: "demo_point",
-			Pose:    poseAt(-1*sp, 0, 0),
-			Color:   &Color{R: 255, G: 225, B: 25},
-			Opacity: ptr(1.0),
-		},
-		{
-			Type: "arrow", Label: "demo_arrow",
-			Pose:     poseAt(0, 0, 0),
+			Color: &Color{R: 0, G: 130, B: 200}, Opacity: ptr(1.0)},
+		Point{Label: "demo_point", Pose: poseAt(-1*sp, 0, 0),
+			Color: &Color{R: 255, G: 225, B: 25}, Opacity: ptr(1.0)},
+		Arrow{Label: "demo_arrow", Pose: poseAt(0, 0, 0),
 			LengthMM: 220, RadiusMM: 12,
-			Color:   &Color{R: 145, G: 30, B: 180},
-			Opacity: ptr(1.0),
-		},
-		{
-			Type: "mesh", Label: "demo_icosahedron",
-			Pose:     poseAt(1*sp, 0, 0),
+			Color: &Color{R: 145, G: 30, B: 180}, Opacity: ptr(1.0)},
+		Mesh{Label: "demo_icosahedron", Pose: poseAt(1*sp, 0, 0),
 			MeshPath: "assets/icosahedron.ply",
-			Color:    &Color{R: 240, G: 50, B: 230},
-			Opacity:  ptr(1.0),
-		},
+			Color: &Color{R: 240, G: 50, B: 230}, Opacity: ptr(1.0)},
 		// STL→PLY converted at load time. Works.
-		{
-			Type: "mesh", Label: "demo_bunny",
-			Pose:     poseAt(2*sp, 0, 0),
+		Mesh{Label: "demo_bunny", Pose: poseAt(2*sp, 0, 0),
 			MeshPath: "assets/bunny.stl",
-			Color:    &Color{R: 245, G: 130, B: 49},
-			Opacity:  ptr(1.0),
-		},
-		// Same bunny STL — shipped raw, content_type="stl", bypassing
-		// stl_to_ply. Bug-demo for the viz team: proto/RDK contract
-		// claims STL works (NewMeshFromProto at
-		// rdk/spatialmath/mesh.go:234-243 accepts both ply and stl)
-		// but the viewer drops it silently. Should render as empty
-		// space immediately right of the working twin.
-		{
-			Type: "mesh", Label: "demo_bunny_raw_stl",
-			Pose:     poseAt(3*sp, 0, 0),
-			MeshPath: "assets/bunny.stl",
-			RawSTL:   true,
-			Color:    &Color{R: 245, G: 130, B: 49},
-			Opacity:  ptr(1.0),
-		},
-		{
-			Type: "mesh", Label: "demo_torus",
-			Pose:     poseAt(4*sp, 0, 0),
+			Color: &Color{R: 245, G: 130, B: 49}, Opacity: ptr(1.0)},
+		// Same STL, shipped raw with content_type="stl" (bypassing
+		// stl_to_ply). Bug-demo: proto/RDK contract accepts STL on
+		// the wire (NewMeshFromProto at rdk/spatialmath/mesh.go:234-
+		// 243) but the viewer drops it silently. Should render as
+		// empty space right of the working twin.
+		Mesh{Label: "demo_bunny_raw_stl", Pose: poseAt(3*sp, 0, 0),
+			MeshPath: "assets/bunny.stl", RawSTL: true,
+			Color: &Color{R: 245, G: 130, B: 49}, Opacity: ptr(1.0)},
+		Mesh{Label: "demo_torus", Pose: poseAt(4*sp, 0, 0),
 			MeshPath: "assets/torus.ply",
-			Color:    &Color{R: 70, G: 240, B: 240},
-			Opacity:  ptr(1.0),
-		},
-		{
-			Type: "mesh", Label: "demo_teapot",
-			Pose:     poseAt(5*sp, 0, 0),
+			Color: &Color{R: 70, G: 240, B: 240}, Opacity: ptr(1.0)},
+		Mesh{Label: "demo_teapot", Pose: poseAt(5*sp, 0, 0),
 			MeshPath: "assets/teapot.ply",
-			Color:    &Color{R: 60, G: 180, B: 75},
-			Opacity:  ptr(1.0),
-		},
-		// PLY w/ per-vertex rainbow colors. The PLY's embedded
-		// `property uchar red/green/blue` is silently ignored by the
-		// viewer; our service transcodes those to metadata.colors,
-		// but the viewer collapses an N-vertex color array to a
-		// single uniform tint (the FIRST color). The whole sphere
-		// renders as one solid color. No `color` override here so
-		// the embedded vertex colors are the only color source.
-		{
-			Type: "mesh", Label: "demo_colorful_sphere_mesh",
-			Pose:     poseAt(6*sp, 0, 0),
-			MeshPath: "assets/colorful_sphere.ply",
-			Opacity:  ptr(1.0),
-		},
+			Color: &Color{R: 60, G: 180, B: 75}, Opacity: ptr(1.0)},
+		// PLY w/ per-vertex rainbow colors. The service transcodes
+		// embedded vertex colors to metadata.colors, but the viewer
+		// collapses N colors to one uniform tint (the FIRST color).
+		// No `Color` here so vertex colors are the only color source.
+		Mesh{Label: "demo_colorful_sphere_mesh", Pose: poseAt(6*sp, 0, 0),
+			MeshPath: "assets/colorful_sphere.ply", Opacity: ptr(1.0)},
 		// PLY w/ per-FACE rainbow colors instead of per-vertex.
-		// Untested. The per-vertex case is known broken; this asset
-		// asks "does the same renderer treat per-FACE colors any
-		// differently?".
-		{
-			Type: "mesh", Label: "demo_colorful_sphere_faces_mesh",
-			Pose:     poseAt(7*sp, 0, 0),
-			MeshPath: "assets/colorful_sphere_faces.ply",
-			Opacity:  ptr(1.0),
-		},
-		// PLY w/ per-vertex UV coordinates and a `comment TextureFile`
-		// header. No texture image is shipped — commonpb.Mesh has no
-		// slot for texture bytes regardless. Untested. The question
-		// is what the viewer does when it receives a PLY whose
-		// header declares UV properties at all.
-		{
-			Type: "mesh", Label: "demo_uv_sphere_mesh",
-			Pose:     poseAt(8*sp, 0, 0),
-			MeshPath: "assets/uv_sphere.ply",
-			Opacity:  ptr(1.0),
-		},
-		// PCD version — per-point RGB embedded in the file body.
-		// Renders correctly because the viewer reads PCD per-point
-		// colors when metadata.colors is absent. Direct comparison
-		// with the three mesh siblings on the left.
-		{
-			Type: "pointcloud", Label: "demo_colorful_sphere",
-			Pose:           poseAt(9*sp, 0, 0),
-			PointcloudPath: "assets/colorful_sphere.pcd",
-			Opacity:        ptr(1.0),
-		},
-		{
-			Type: "pointcloud", Label: "demo_pointcloud",
-			Pose:           poseAt(10*sp, 0, 0),
-			PointcloudPath: "assets/helix.pcd",
-			Opacity:        ptr(1.0),
-		},
-		{
-			Type: "pointcloud", Label: "demo_pointcloud_chunked",
-			Pose:           poseAt(11*sp, 0, 0),
-			PointcloudPath: "assets/helix.pcd",
-			Opacity:        ptr(1.0),
-			Chunked:        true,
-			ChunkSize:      2000,
-		},
-	}
+		// Untested.
+		Mesh{Label: "demo_colorful_sphere_faces_mesh", Pose: poseAt(7*sp, 0, 0),
+			MeshPath: "assets/colorful_sphere_faces.ply", Opacity: ptr(1.0)},
+		// PLY w/ UV coords + comment TextureFile. commonpb.Mesh has
+		// no slot for texture bytes. Untested.
+		Mesh{Label: "demo_uv_sphere_mesh", Pose: poseAt(8*sp, 0, 0),
+			MeshPath: "assets/uv_sphere.ply", Opacity: ptr(1.0)},
+		// PCD version — per-point RGB embedded; works because viewer
+		// reads PCD per-point colors when metadata.colors is absent.
+		PointCloud{Label: "demo_colorful_sphere", Pose: poseAt(9*sp, 0, 0),
+			PointcloudPath: "assets/colorful_sphere.pcd", Opacity: ptr(1.0)},
+		PointCloud{Label: "demo_pointcloud", Pose: poseAt(10*sp, 0, 0),
+			PointcloudPath: "assets/helix.pcd", Opacity: ptr(1.0)},
+		PointCloud{Label: "demo_pointcloud_chunked", Pose: poseAt(11*sp, 0, 0),
+			PointcloudPath: "assets/helix.pcd", Opacity: ptr(1.0),
+			Chunked: true, ChunkSize: 2000},
+	)
 }
 
 // ---- orientation vectors ---------------------------------------------
@@ -290,23 +212,24 @@ func primitivesPreset() []Item {
 func orientationVectorsPreset() []Item {
 	sp := PrimitiveRowSpacingMM
 	const hostR = 18.0
-	mk := func(label string, pose Pose) Item {
-		return Item{
-			Type: "sphere", Label: label, Pose: pose,
+	frame := func(label string, x, ox, oy, oz, theta float64) Sphere {
+		return Sphere{
+			Label: label,
+			Pose:  PoseAt(x, 0, 0, ox, oy, oz, theta),
 			RadiusMM:       hostR,
 			Color:          &Color{R: 220, G: 220, B: 220},
 			Opacity:        ptr(0.35),
 			ShowAxesHelper: true,
 		}
 	}
-	out := []Item{}
-	out = append(out, mk("frame_+Z", Pose{X: -2 * sp, OZ: 1}))
-	out = append(out, mk("frame_+X", Pose{X: -sp, OX: 1}))
-	out = append(out, mk("frame_+Y", Pose{X: 0, OY: 1}))
 	s := 1.0 / math.Sqrt(2)
-	out = append(out, mk("frame_+XY", Pose{X: sp, OX: s, OY: s}))
-	out = append(out, mk("frame_+Z_theta45", Pose{X: 2 * sp, OZ: 1, Theta: 45}))
-	return out
+	return ToItems(
+		frame("frame_+Z", -2*sp, 0, 0, 1, 0),
+		frame("frame_+X", -sp, 1, 0, 0, 0),
+		frame("frame_+Y", 0, 0, 1, 0, 0),
+		frame("frame_+XY", sp, s, s, 0, 0),
+		frame("frame_+Z_theta45", 2*sp, 0, 0, 1, 45),
+	)
 }
 
 // ---- reference frame demo (component of frame_composition) -----------
@@ -315,80 +238,60 @@ func referenceFrameDemo() []Item {
 	const axisLength = 200.0
 	const axisRadius = 12.0
 	half := axisLength / 2.0
-	out := []Item{
+	visuals := []Visual{
 		// Anchor — spins around Z; children inherit.
-		{
-			Type: "sphere", Label: "spinning_frame",
-			Pose:           identityPose(),
-			RadiusMM:       12,
-			Color:          &Color{R: 255, G: 255, B: 255},
-			Opacity:        ptr(0.6),
-			ShowAxesHelper: true,
-			Animation:      Animation{Mode: "spin", PeriodS: 6},
-		},
-		// +X axis (red).
-		{
-			Type: "capsule", Label: "spinning_frame_axis_x", ParentFrame: "spinning_frame",
-			Pose:     Pose{X: half, OX: 1},
+		Sphere{Label: "spinning_frame", Pose: identityPose(),
+			RadiusMM: 12, Color: &Color{R: 255, G: 255, B: 255},
+			Opacity: ptr(0.6), ShowAxesHelper: true,
+			Animation: Spin{PeriodS: 6}},
+		// RGB axis triad — three capsules parented to anchor.
+		Capsule{Label: "spinning_frame_axis_x", ParentFrame: "spinning_frame",
+			Pose: PoseAt(half, 0, 0, 1, 0, 0, 0),
 			RadiusMM: axisRadius, LengthMM: axisLength,
-			Color:   &Color{R: 230, G: 25, B: 75},
-			Opacity: ptr(1.0),
-		},
-		// +Y axis (green).
-		{
-			Type: "capsule", Label: "spinning_frame_axis_y", ParentFrame: "spinning_frame",
-			Pose:     Pose{Y: half, OY: 1},
+			Color: &Color{R: 230, G: 25, B: 75}, Opacity: ptr(1.0)},
+		Capsule{Label: "spinning_frame_axis_y", ParentFrame: "spinning_frame",
+			Pose: PoseAt(0, half, 0, 0, 1, 0, 0),
 			RadiusMM: axisRadius, LengthMM: axisLength,
-			Color:   &Color{R: 60, G: 180, B: 75},
-			Opacity: ptr(1.0),
-		},
-		// +Z axis (blue).
-		{
-			Type: "capsule", Label: "spinning_frame_axis_z", ParentFrame: "spinning_frame",
-			Pose:     Pose{Z: half, OZ: 1},
+			Color: &Color{R: 60, G: 180, B: 75}, Opacity: ptr(1.0)},
+		Capsule{Label: "spinning_frame_axis_z", ParentFrame: "spinning_frame",
+			Pose: PoseAt(0, 0, half, 0, 0, 1, 0),
 			RadiusMM: axisRadius, LengthMM: axisLength,
-			Color:   &Color{R: 0, G: 130, B: 200},
-			Opacity: ptr(1.0),
-		},
-		// Attached mesh — spins on its own axis at a different rate.
-		{
-			Type: "mesh", Label: "spinning_frame_attached_mesh", ParentFrame: "spinning_frame",
-			Pose:      Pose{X: 700, OZ: 1},
-			MeshPath:  "assets/icosahedron.ply",
-			Color:     &Color{R: 240, G: 200, B: 50},
-			Opacity:   ptr(1.0),
-			Animation: Animation{Mode: "spin", PeriodS: 2},
-		},
-		// Invisible wheel hub — spins on its own axis.
-		{
-			Type: "sphere", Label: "spinning_frame_wheel_hub",
+			Color: &Color{R: 0, G: 130, B: 200}, Opacity: ptr(1.0)},
+		// Mesh — orbits with anchor AND spins on its own axis.
+		Mesh{Label: "spinning_frame_attached_mesh", ParentFrame: "spinning_frame",
+			Pose: Pose{X: 700, OZ: 1, hasOrient: true},
+			MeshPath: "assets/icosahedron.ply",
+			Color: &Color{R: 240, G: 200, B: 50}, Opacity: ptr(1.0),
+			Animation: Spin{PeriodS: 2}},
+		// Invisible wheel hub — adds its own spin on top of mesh +
+		// anchor. Tiny radius + opacity 0 keeps it invisible; we
+		// avoid Invisible=true because the viewer's behavior for
+		// invisible parents in the composition tree is unverified.
+		Sphere{Label: "spinning_frame_wheel_hub",
 			ParentFrame: "spinning_frame_attached_mesh",
 			Pose:        identityPose(),
 			RadiusMM:    4,
 			Color:       &Color{R: 255, G: 255, B: 255},
 			Opacity:     ptr(0.0),
-			Animation:   Animation{Mode: "spin", PeriodS: 10},
-		},
+			Animation:   Spin{PeriodS: 10}},
 	}
-	out = append(out, colorWheelChildren("spinning_frame_wheel_hub", 10, 220.0, 24.0)...)
-	return out
+	for _, sv := range colorWheelChildrenVisuals("spinning_frame_wheel_hub", 10, 220.0, 24.0) {
+		visuals = append(visuals, sv)
+	}
+	return ToItems(visuals...)
 }
 
-func colorWheelChildren(parent string, count int, ringR, sphereR float64) []Item {
-	out := []Item{}
+func colorWheelChildrenVisuals(parent string, count int, ringR, sphereR float64) []Sphere {
+	out := make([]Sphere, 0, count)
 	for i := 0; i < count; i++ {
 		hue := float64(i) / float64(count)
 		r, g, b := hsvToRGBu8(hue, 1, 1)
 		angle := 2 * math.Pi * float64(i) / float64(count)
-		out = append(out, Item{
-			Type:        "sphere",
+		out = append(out, Sphere{
 			Label:       fmt.Sprintf("%s_wheel_%02d", parent, i),
 			ParentFrame: parent,
-			Pose: Pose{
-				X:  ringR * math.Cos(angle),
-				Y:  ringR * math.Sin(angle),
-				OZ: 1,
-			},
+			Pose: PoseAt(ringR*math.Cos(angle), ringR*math.Sin(angle), 0,
+				0, 0, 1, 0),
 			RadiusMM: sphereR,
 			Color:    &Color{R: r, G: g, B: b},
 			Opacity:  ptr(1.0),
@@ -408,87 +311,60 @@ func robotArm() []Item {
 	const palmThick = 10.0
 	const fingerL = 70.0
 	const fingerThick = 8.0
+	jointColor := &Color{R: 230, G: 25, B: 75}
+	clawColor := &Color{R: 220, G: 220, B: 70}
 
-	out := []Item{
-		{
-			Type: "capsule", Label: "arm_base",
-			Pose:     Pose{Z: baseH / 2, OZ: 1},
+	return ToItems(
+		// Base — stout capsule, swings on Z.
+		Capsule{Label: "arm_base", Pose: poseAt(0, 0, baseH/2),
 			RadiusMM: linkR * 1.6, LengthMM: baseH,
-			Color:     &Color{R: 70, G: 70, B: 75},
-			Opacity:   ptr(1.0),
-			Animation: Animation{Mode: "swing", AmplitudeDeg: 75.0, PeriodS: 8},
-		},
-		{
-			Type: "sphere", Label: "arm_shoulder", ParentFrame: "arm_base",
-			Pose: Pose{
-				Z: baseH/2 + linkR, OY: 1,
-			},
-			RadiusMM: jointR,
-			Color:    &Color{R: 230, G: 25, B: 75},
-			Opacity:  ptr(1.0),
-		},
-		{
-			Type: "capsule", Label: "arm_upper", ParentFrame: "arm_shoulder",
-			Pose:     Pose{Z: upperL / 2, OZ: 1},
+			Color: &Color{R: 70, G: 70, B: 75}, Opacity: ptr(1.0),
+			Animation: Swing{AmplitudeDeg: 75.0, PeriodS: 8}},
+		// Shoulder — OY=1 tips local +Z into world +Y.
+		Sphere{Label: "arm_shoulder", ParentFrame: "arm_base",
+			Pose:     PoseAt(0, 0, baseH/2+linkR, 0, 1, 0, 0),
+			RadiusMM: jointR, Color: jointColor, Opacity: ptr(1.0)},
+		// Upper arm.
+		Capsule{Label: "arm_upper", ParentFrame: "arm_shoulder",
+			Pose: poseAt(0, 0, upperL/2),
 			RadiusMM: linkR, LengthMM: upperL,
-			Color:   &Color{R: 100, G: 130, B: 200},
-			Opacity: ptr(1.0),
-		},
-		{
-			Type: "sphere", Label: "arm_elbow", ParentFrame: "arm_upper",
-			Pose: Pose{Z: upperL/2 + linkR, OY: 1, Theta: -60},
-			RadiusMM:  jointR * 0.8,
-			Color:     &Color{R: 230, G: 25, B: 75},
-			Opacity:   ptr(1.0),
-			Animation: Animation{Mode: "swing", AmplitudeDeg: 50.0, PeriodS: 5},
-		},
-		{
-			Type: "capsule", Label: "arm_forearm", ParentFrame: "arm_elbow",
-			Pose:     Pose{Z: forearmL / 2, OZ: 1},
+			Color: &Color{R: 100, G: 130, B: 200}, Opacity: ptr(1.0)},
+		// Elbow — bounded RoM.
+		Sphere{Label: "arm_elbow", ParentFrame: "arm_upper",
+			Pose:     PoseAt(0, 0, upperL/2+linkR, 0, 1, 0, -60),
+			RadiusMM: jointR * 0.8,
+			Color: jointColor, Opacity: ptr(1.0),
+			Animation: Swing{AmplitudeDeg: 50.0, PeriodS: 5}},
+		// Forearm.
+		Capsule{Label: "arm_forearm", ParentFrame: "arm_elbow",
+			Pose: poseAt(0, 0, forearmL/2),
 			RadiusMM: linkR * 0.85, LengthMM: forearmL,
-			Color:   &Color{R: 100, G: 180, B: 110},
-			Opacity: ptr(1.0),
-		},
-		{
-			Type: "sphere", Label: "arm_wrist", ParentFrame: "arm_forearm",
-			Pose:      Pose{Z: forearmL/2 + linkR*0.6, OZ: 1},
-			RadiusMM:  jointR * 0.65,
-			Color:     &Color{R: 230, G: 25, B: 75},
-			Opacity:   ptr(1.0),
-			Animation: Animation{Mode: "swing", AmplitudeDeg: 90.0, PeriodS: 6},
-		},
-		{
-			Type: "box", Label: "claw_palm", ParentFrame: "arm_wrist",
-			Pose:    Pose{Z: jointR*0.6 + palmThick/2, OZ: 1},
-			HasDims: true,
-			DimsMM:  BoxDims{X: 70, Y: 28, Z: palmThick},
-			Color:   &Color{R: 220, G: 220, B: 70},
-			Opacity: ptr(1.0),
-		},
-		{
-			Type: "box", Label: "claw_left_finger", ParentFrame: "claw_palm",
-			Pose:    Pose{X: -22, Z: palmThick/2 + fingerL/2, OZ: 1},
-			HasDims: true,
-			DimsMM:  BoxDims{X: fingerThick, Y: fingerThick, Z: fingerL},
-			Color:   &Color{R: 220, G: 220, B: 70},
-			Opacity: ptr(1.0),
-			Animation: Animation{
-				Mode: "oscillate", Axis: "x", AmplitudeMM: -10.0, PeriodS: 3,
-			},
-		},
-		{
-			Type: "box", Label: "claw_right_finger", ParentFrame: "claw_palm",
-			Pose:    Pose{X: 22, Z: palmThick/2 + fingerL/2, OZ: 1},
-			HasDims: true,
-			DimsMM:  BoxDims{X: fingerThick, Y: fingerThick, Z: fingerL},
-			Color:   &Color{R: 220, G: 220, B: 70},
-			Opacity: ptr(1.0),
-			Animation: Animation{
-				Mode: "oscillate", Axis: "x", AmplitudeMM: 10.0, PeriodS: 3,
-			},
-		},
-	}
-	return out
+			Color: &Color{R: 100, G: 180, B: 110}, Opacity: ptr(1.0)},
+		// Wrist — rolls about the forearm; the 2-finger claw makes
+		// the rotation visible.
+		Sphere{Label: "arm_wrist", ParentFrame: "arm_forearm",
+			Pose:     poseAt(0, 0, forearmL/2+linkR*0.6),
+			RadiusMM: jointR * 0.65,
+			Color: jointColor, Opacity: ptr(1.0),
+			Animation: Swing{AmplitudeDeg: 90.0, PeriodS: 6}},
+		// Claw palm.
+		Box{Label: "claw_palm", ParentFrame: "arm_wrist",
+			Pose:   poseAt(0, 0, jointR*0.6+palmThick/2),
+			DimsMM: BoxDims{X: 70, Y: 28, Z: palmThick},
+			Color: clawColor, Opacity: ptr(1.0)},
+		// Left finger.
+		Box{Label: "claw_left_finger", ParentFrame: "claw_palm",
+			Pose:   poseAt(-22, 0, palmThick/2+fingerL/2),
+			DimsMM: BoxDims{X: fingerThick, Y: fingerThick, Z: fingerL},
+			Color: clawColor, Opacity: ptr(1.0),
+			Animation: Oscillate{Axis: "x", AmplitudeMM: -10.0, PeriodS: 3}},
+		// Right finger.
+		Box{Label: "claw_right_finger", ParentFrame: "claw_palm",
+			Pose:   poseAt(22, 0, palmThick/2+fingerL/2),
+			DimsMM: BoxDims{X: fingerThick, Y: fingerThick, Z: fingerL},
+			Color: clawColor, Opacity: ptr(1.0),
+			Animation: Oscillate{Axis: "x", AmplitudeMM: 10.0, PeriodS: 3}},
+	)
 }
 
 // ---- frame composition -----------------------------------------------
@@ -511,16 +387,12 @@ func trajectoryPreviewPreset() []Item {
 		{X: 1000, Y: 0, Z: 0, Theta: 0},
 	}
 	waypoints := waypointsWithTangentOrientations(positions)
-	out := []Item{}
+	visuals := []Visual{}
 	for i, wp := range waypoints {
-		out = append(out, Item{
-			Type:           "sphere",
-			Label:          fmt.Sprintf("traj_wp_%02d", i),
-			Pose:           wp,
-			RadiusMM:       18,
-			Color:          &Color{R: 200, G: 200, B: 220},
-			Opacity:        ptr(0.45),
-			ShowAxesHelper: true,
+		visuals = append(visuals, Sphere{
+			Label: fmt.Sprintf("traj_wp_%02d", i), Pose: wp,
+			RadiusMM: 18, Color: &Color{R: 200, G: 200, B: 220},
+			Opacity: ptr(0.45), ShowAxesHelper: true,
 		})
 	}
 	for i := 0; i < len(waypoints)-1; i++ {
@@ -531,35 +403,21 @@ func trajectoryPreviewPreset() []Item {
 		if segLen < 1e-6 {
 			continue
 		}
-		out = append(out, Item{
-			Type:  "capsule",
+		visuals = append(visuals, Capsule{
 			Label: fmt.Sprintf("traj_seg_%02d", i),
-			Pose: Pose{
-				X: (a.X + b.X) / 2, Y: (a.Y + b.Y) / 2, Z: (a.Z + b.Z) / 2,
-				OX: dx / segLen, OY: dy / segLen, OZ: dz / segLen,
-			},
+			Pose: PoseAt((a.X+b.X)/2, (a.Y+b.Y)/2, (a.Z+b.Z)/2,
+				dx/segLen, dy/segLen, dz/segLen, 0),
 			RadiusMM: 5, LengthMM: segLen,
-			Color:   &Color{R: 100, G: 130, B: 240},
-			Opacity: ptr(0.95),
+			Color: &Color{R: 100, G: 130, B: 240}, Opacity: ptr(0.95),
 		})
 	}
-	out = append(out, Item{
-		Type:           "sphere",
-		Label:          "traj_runner",
-		Pose:           waypoints[0],
-		RadiusMM:       28,
-		Color:          &Color{R: 230, G: 40, B: 80},
-		Opacity:        ptr(0.9),
-		ShowAxesHelper: true,
-		Animation: Animation{
-			Mode:      "trajectory",
-			Waypoints: waypoints,
-			DurationS: 12.0,
-			Loop:      true,
-			HasLoop:   true,
-		},
+	visuals = append(visuals, Sphere{
+		Label: "traj_runner", Pose: waypoints[0],
+		RadiusMM: 28, Color: &Color{R: 230, G: 40, B: 80},
+		Opacity: ptr(0.9), ShowAxesHelper: true,
+		Animation: Trajectory{Waypoints: waypoints, DurationS: 12.0, Loop: true},
 	})
-	return out
+	return ToItems(visuals...)
 }
 
 func waypointsWithTangentOrientations(positions []Pose) []Pose {
@@ -598,103 +456,77 @@ func waypointsWithTangentOrientations(positions []Pose) []Pose {
 // ---- force vector demo -----------------------------------------------
 
 func forceVectorDemoPreset() []Item {
-	return []Item{{
-		Type: "arrow", Label: "force_vector",
-		Pose:     identityPose(),
+	return ToItems(Arrow{
+		Label: "force_vector", Pose: identityPose(),
 		LengthMM: 220, RadiusMM: 10,
-		Color:   &Color{R: 230, G: 60, B: 100},
-		Opacity: ptr(1.0),
-		Animation: Animation{
-			Mode:              "force_vector",
-			PeriodS:           5.0,
-			LengthAmplitudeMM: 80,
-			RadiusAmplitudeMM: 5,
-			TiltDeg:           45,
-			PrecessionSpeed:   1.0,
-			ColorSpeed:        0.7,
+		Color: &Color{R: 230, G: 60, B: 100}, Opacity: ptr(1.0),
+		Animation: ForceVector{
+			PeriodS: 5.0, LengthAmplitudeMM: 80, RadiusAmplitudeMM: 5,
+			TiltDeg: 45, PrecessionSpeed: 1.0, ColorSpeed: 0.7,
 		},
-	}}
+	})
 }
 
 // ---- geometry morph --------------------------------------------------
 
 func geometryMorphPreset() []Item {
-	out := []Item{}
+	visuals := []Visual{}
 	slotX := 0.0
 
-	out = append(out, Item{
-		Type: "sphere", Label: "morph_pulse_sphere",
-		Pose:     poseAt(slotX, 0, 0),
-		RadiusMM: 70,
-		Color:    &Color{R: 230, G: 60, B: 100},
-		Opacity:  ptr(1.0),
-		Animation: Animation{
-			Mode: "pulse", AmplitudeMM: 35, PeriodS: 3,
-		},
+	// Pulsing sphere.
+	visuals = append(visuals, Sphere{
+		Label: "morph_pulse_sphere", Pose: poseAt(slotX, 0, 0),
+		RadiusMM: 70, Color: &Color{R: 230, G: 60, B: 100}, Opacity: ptr(1.0),
+		Animation: Pulse{AmplitudeMM: 35, PeriodS: 3},
 	})
 	slotX += 350
 
-	out = append(out, Item{
-		Type: "box", Label: "morph_stretch_box",
-		Pose:    poseAt(slotX, 0, 0),
-		HasDims: true,
-		DimsMM:  BoxDims{X: 100, Y: 100, Z: 150},
-		Color:   &Color{R: 100, G: 180, B: 230},
-		Opacity: ptr(1.0),
-		Animation: Animation{
-			Mode: "pulse", Axis: "z", AmplitudeMM: 100, PeriodS: 4,
-		},
+	// Box stretching along Z.
+	visuals = append(visuals, Box{
+		Label: "morph_stretch_box", Pose: poseAt(slotX, 0, 0),
+		DimsMM: BoxDims{X: 100, Y: 100, Z: 150},
+		Color: &Color{R: 100, G: 180, B: 230}, Opacity: ptr(1.0),
+		Animation: Pulse{Axis: "z", AmplitudeMM: 100, PeriodS: 4},
 	})
 	slotX += 350
 
-	out = append(out, Item{
-		Type: "capsule", Label: "morph_breathe_capsule",
-		Pose:     poseAt(slotX, 0, 0),
+	// Capsule breathing in opacity.
+	visuals = append(visuals, Capsule{
+		Label: "morph_breathe_capsule", Pose: poseAt(slotX, 0, 0),
 		RadiusMM: 45, LengthMM: 240,
-		Color:   &Color{R: 220, G: 200, B: 60},
-		Opacity: ptr(0.7),
-		Animation: Animation{
-			Mode: "breathe", Amplitude: 0.55, PeriodS: 1.5,
-		},
+		Color: &Color{R: 220, G: 200, B: 60}, Opacity: ptr(0.7),
+		Animation: Breathe{Amplitude: 0.55, PeriodS: 1.5},
 	})
 	slotX += 380
 
+	// Two 5×5 flicker grids — green works (UUID rotates), red is
+	// the bug-demo (UUID stable across re-adds).
 	gridN := 5
 	gridSpacing := 80.0
 	periodS := 4.0
-
-	addGrid := func(prefix string, originX float64, col Color, rotateUUID bool) {
+	addGrid := func(prefix string, originX float64, col *Color, rotateUUID bool) {
 		for row := 0; row < gridN; row++ {
 			for col2 := 0; col2 < gridN; col2++ {
 				phaseOff := float64(row+col2) / float64(2*gridN-1) * periodS
 				ru := rotateUUID
-				out = append(out, Item{
-					Type:  "sphere",
+				visuals = append(visuals, Sphere{
 					Label: fmt.Sprintf("%s_%d%d", prefix, row, col2),
-					Pose: poseAt(
-						originX+float64(col2)*gridSpacing,
-						float64(row)*gridSpacing,
-						0,
-					),
-					RadiusMM: 22,
-					Color:    &col,
-					Opacity:  ptr(1.0),
-					Animation: Animation{
-						Mode:              "flicker",
-						PeriodS:           periodS,
-						DutyCycle:         0.55,
-						PhaseOffsetS:      phaseOff,
-						RotateUUIDOnReadd: &ru,
+					Pose: poseAt(originX+float64(col2)*gridSpacing,
+						float64(row)*gridSpacing, 0),
+					RadiusMM: 22, Color: col, Opacity: ptr(1.0),
+					Animation: Flicker{
+						PeriodS: periodS, DutyCycle: 0.55,
+						PhaseOffsetS: phaseOff, RotateUUIDOnReadd: &ru,
 					},
 				})
 			}
 		}
 	}
 	workingOriginX := slotX + 60
-	addGrid("morph_grid", workingOriginX, Color{R: 80, G: 200, B: 140}, true)
+	addGrid("morph_grid", workingOriginX, &Color{R: 80, G: 200, B: 140}, true)
 	brokenOriginX := workingOriginX + float64(gridN)*gridSpacing + 80
-	addGrid("morph_grid_broken", brokenOriginX, Color{R: 230, G: 60, B: 60}, false)
-	return out
+	addGrid("morph_grid_broken", brokenOriginX, &Color{R: 230, G: 60, B: 60}, false)
+	return ToItems(visuals...)
 }
 
 // ---- lifecycle demo --------------------------------------------------
@@ -704,41 +536,34 @@ func lifecycleDemoPreset() []Item {
 	sp := 250.0
 	appearS, aliveS, disappearS, goneS := 1.0, 2.0, 1.0, 2.0
 	periodS := appearS + aliveS + disappearS + goneS
-	out := []Item{}
+	visuals := make([]Visual, 0, count)
 	for i := 0; i < count; i++ {
 		off := float64(i) / float64(count) * periodS
-		out = append(out, Item{
-			Type: "box",
+		visuals = append(visuals, Box{
 			Label: fmt.Sprintf("lifecycle_%02d", i),
-			Pose:    poseAt((float64(i)-float64(count-1)/2.0)*sp, 0, 0),
-			HasDims: true,
-			DimsMM:  BoxDims{X: 120, Y: 120, Z: 120},
-			Color:   &Color{R: 128, G: 128, B: 128},
-			Opacity: ptr(1.0),
-			Animation: Animation{
-				Mode:         "lifecycle",
-				AppearS:      appearS,
-				AliveS:       aliveS,
-				DisappearS:   disappearS,
-				GoneS:        goneS,
+			Pose:  poseAt((float64(i)-float64(count-1)/2.0)*sp, 0, 0),
+			DimsMM: BoxDims{X: 120, Y: 120, Z: 120},
+			// Color/Opacity overridden every tick by the lifecycle
+			// animation; static values are placeholders.
+			Color: &Color{R: 128, G: 128, B: 128}, Opacity: ptr(1.0),
+			Animation: Lifecycle{
+				AppearS: appearS, AliveS: aliveS,
+				DisappearS: disappearS, GoneS: goneS,
 				PhaseOffsetS: off,
 			},
 		})
 	}
-	return out
+	return ToItems(visuals...)
 }
 
 // ---- chunked PCD demo (standalone) -----------------------------------
 
 func chunkedPCDDemoPreset() []Item {
-	return []Item{{
-		Type: "pointcloud", Label: "chunked_helix",
-		Pose:           identityPose(),
-		PointcloudPath: "assets/helix.pcd",
-		Opacity:        ptr(1.0),
-		Chunked:        true,
-		ChunkSize:      2000,
-	}}
+	return ToItems(PointCloud{
+		Label: "chunked_helix", Pose: identityPose(),
+		PointcloudPath: "assets/helix.pcd", Opacity: ptr(1.0),
+		Chunked: true, ChunkSize: 2000,
+	})
 }
 
 // ---- all (Y-stacked) -------------------------------------------------
