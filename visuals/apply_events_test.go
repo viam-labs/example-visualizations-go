@@ -67,11 +67,11 @@ func newBareService(t *testing.T) *SceneServiceBase {
 
 func boxMap(label string) map[string]any {
 	return map[string]any{
-		"type":  "box",
-		"label": label,
-		"pose":  map[string]any{"x": 0.0, "y": 0.0, "z": 0.0, "ox": 0.0, "oy": 0.0, "oz": 1.0, "theta": 0.0},
-		"dims_mm": map[string]any{"x": 100.0, "y": 100.0, "z": 100.0},
-		"color": map[string]any{"r": 255.0, "g": 0.0, "b": 0.0},
+		"type":      "box",
+		"label":     label,
+		"pose":      map[string]any{"x": 0.0, "y": 0.0, "z": 0.0, "ox": 0.0, "oy": 0.0, "oz": 1.0, "theta": 0.0},
+		"dims_mm":   map[string]any{"x": 100.0, "y": 100.0, "z": 100.0},
+		"color":     map[string]any{"r": 255.0, "g": 0.0, "b": 0.0},
 		"opacity":   1.0,
 		"animation": map[string]any{"mode": "none"},
 	}

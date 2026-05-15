@@ -1,10 +1,15 @@
-// scene-primitives — thin sceneSprites over visuals.SceneServiceBase.
+// standalone-playground — thin sceneSprites over visuals.SceneServiceBase.
 //
 // The library owns the WSS plumbing (state map, subscriber fanout,
 // animation tick goroutine, UUID strategy, standard DoCommand
-// verbs). This file plugs in the playground's MODEL and the
-// module-specific hooks (geometry building, asset reading,
-// animation tick math, preset lookup, the get_entity_chunk verb).
+// verbs including apply_events). This file plugs in the standalone
+// model's MODEL identifier and the module-specific hooks (geometry
+// building, asset reading, animation tick math, preset lookup, the
+// get_entity_chunk custom verb).
+//
+// The companion files visualizer.go and driver.go register the
+// other two models the module ships (playground-visualizer +
+// playground-driver). See CLAUDE.md for the three-model architecture.
 package exampleviz
 
 import (

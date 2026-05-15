@@ -88,17 +88,17 @@ type playgroundDriver struct {
 	resource.TriviallyCloseable
 	logger logging.Logger
 
-	mu          sync.Mutex
-	visName     string
-	visualizer  worldstatestore.Service
-	recipeName  string
-	tickHz      float64
-	namespace   string
-	scene       *visuals.Scene
-	recipe      Recipe
-	tickCancel  context.CancelFunc
-	tickDone    chan struct{}
-	t0          time.Time
+	mu         sync.Mutex
+	visName    string
+	visualizer worldstatestore.Service
+	recipeName string
+	tickHz     float64
+	namespace  string
+	scene      *visuals.Scene
+	recipe     Recipe
+	tickCancel context.CancelFunc
+	tickDone   chan struct{}
+	t0         time.Time
 }
 
 func newPlaygroundDriver(

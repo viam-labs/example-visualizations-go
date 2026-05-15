@@ -30,10 +30,10 @@ type MarchingBoxes struct{}
 func (MarchingBoxes) Name() string { return "marching_boxes" }
 
 const (
-	mbCount       = 5
-	mbSpacing     = 250.0
-	mbAmplitude   = 150.0
-	mbPeriodS     = 3.0
+	mbCount     = 5
+	mbSpacing   = 250.0
+	mbAmplitude = 150.0
+	mbPeriodS   = 3.0
 )
 
 func (mb MarchingBoxes) Initial(scene *visuals.Scene) []visuals.SceneEvent {
@@ -91,11 +91,11 @@ type PulsingSpheres struct{}
 func (PulsingSpheres) Name() string { return "pulsing_spheres" }
 
 const (
-	psCount     = 3
-	psSpacing   = 400.0
-	psRBase     = 80.0
-	psRAmp      = 30.0
-	psPeriodS   = 2.5
+	psCount   = 3
+	psSpacing = 400.0
+	psRBase   = 80.0
+	psRAmp    = 30.0
+	psPeriodS = 2.5
 )
 
 func (ps PulsingSpheres) Initial(scene *visuals.Scene) []visuals.SceneEvent {

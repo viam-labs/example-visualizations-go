@@ -21,21 +21,21 @@ const PrimitiveRowSpacingMM = 400.0
 // convention and sizing have to agree.
 
 const (
-	ItemLabelHeightMM   = 25.0
-	RowLabelHeightMM    = 70.0
-	ItemLabelZOffsetMM  = -180.0 // labels sit BELOW the item
-	RowLabelZOffsetMM   = 0.0    // row labels inline with row items
+	ItemLabelHeightMM  = 25.0
+	RowLabelHeightMM   = 70.0
+	ItemLabelZOffsetMM = -180.0 // labels sit BELOW the item
+	RowLabelZOffsetMM  = 0.0    // row labels inline with row items
 )
 
 // Item-label color palette — dark, varied. Cycled by a deterministic
 // hash of the label text so the same label always gets the same
 // color across reconfigure cycles.
 var itemLabelColors = []Color{
-	{R: 50, G: 50, B: 50},    // near-black
-	{R: 90, G: 30, B: 90},    // dark plum
-	{R: 30, G: 70, B: 50},    // dark teal-green
-	{R: 110, G: 60, B: 30},   // dark sienna
-	{R: 30, G: 50, B: 100},   // dark navy
+	{R: 50, G: 50, B: 50},  // near-black
+	{R: 90, G: 30, B: 90},  // dark plum
+	{R: 30, G: 70, B: 50},  // dark teal-green
+	{R: 110, G: 60, B: 30}, // dark sienna
+	{R: 30, G: 50, B: 100}, // dark navy
 }
 
 // rowLabelColor — single distinct color for row labels.
@@ -138,9 +138,9 @@ var Presets = map[string]func() []Item{
 
 func ptr[T any](v T) *T { return &v }
 
-func identityPose() Pose            { return Pose{OZ: 1.0} }
-func poseXY(x, y float64) Pose      { return Pose{X: x, Y: y, OZ: 1.0} }
-func poseAt(x, y, z float64) Pose   { return Pose{X: x, Y: y, Z: z, OZ: 1.0} }
+func identityPose() Pose          { return Pose{OZ: 1.0} }
+func poseXY(x, y float64) Pose    { return Pose{X: x, Y: y, OZ: 1.0} }
+func poseAt(x, y, z float64) Pose { return Pose{X: x, Y: y, Z: z, OZ: 1.0} }
 
 // ---- primitives ------------------------------------------------------
 
@@ -149,7 +149,7 @@ func primitivesPreset() []Item {
 	return ToItems(
 		Box{Label: "demo_box", Pose: poseAt(-4*sp, 0, 0),
 			DimsMM: BoxDims{X: 150, Y: 150, Z: 150},
-			Color: &Color{R: 230, G: 25, B: 75}, Opacity: ptr(1.0)},
+			Color:  &Color{R: 230, G: 25, B: 75}, Opacity: ptr(1.0)},
 		Sphere{Label: "demo_sphere", Pose: poseAt(-3*sp, 0, 0),
 			RadiusMM: 90, Color: &Color{R: 60, G: 180, B: 75}, Opacity: ptr(1.0)},
 		Capsule{Label: "demo_capsule", Pose: poseAt(-2*sp, 0, 0),
@@ -162,11 +162,11 @@ func primitivesPreset() []Item {
 			Color: &Color{R: 145, G: 30, B: 180}, Opacity: ptr(1.0)},
 		Mesh{Label: "demo_icosahedron", Pose: poseAt(1*sp, 0, 0),
 			MeshPath: "assets/icosahedron.ply",
-			Color: &Color{R: 240, G: 50, B: 230}, Opacity: ptr(1.0)},
+			Color:    &Color{R: 240, G: 50, B: 230}, Opacity: ptr(1.0)},
 		// STL→PLY converted at load time. Works.
 		Mesh{Label: "demo_bunny", Pose: poseAt(2*sp, 0, 0),
 			MeshPath: "assets/bunny.stl",
-			Color: &Color{R: 245, G: 130, B: 49}, Opacity: ptr(1.0)},
+			Color:    &Color{R: 245, G: 130, B: 49}, Opacity: ptr(1.0)},
 		// Same STL, shipped raw with content_type="stl" (bypassing
 		// stl_to_ply). Bug-demo: proto/RDK contract accepts STL on
 		// the wire (NewMeshFromProto at rdk/spatialmath/mesh.go:234-
@@ -177,10 +177,10 @@ func primitivesPreset() []Item {
 			Color: &Color{R: 245, G: 130, B: 49}, Opacity: ptr(1.0)},
 		Mesh{Label: "demo_torus", Pose: poseAt(4*sp, 0, 0),
 			MeshPath: "assets/torus.ply",
-			Color: &Color{R: 70, G: 240, B: 240}, Opacity: ptr(1.0)},
+			Color:    &Color{R: 70, G: 240, B: 240}, Opacity: ptr(1.0)},
 		Mesh{Label: "demo_teapot", Pose: poseAt(5*sp, 0, 0),
 			MeshPath: "assets/teapot.ply",
-			Color: &Color{R: 60, G: 180, B: 75}, Opacity: ptr(1.0)},
+			Color:    &Color{R: 60, G: 180, B: 75}, Opacity: ptr(1.0)},
 		// PLY w/ per-vertex rainbow colors. The service transcodes
 		// embedded vertex colors to metadata.colors, but the viewer
 		// collapses N colors to one uniform tint (the FIRST color).
@@ -214,8 +214,8 @@ func orientationVectorsPreset() []Item {
 	const hostR = 18.0
 	frame := func(label string, x, ox, oy, oz, theta float64) Sphere {
 		return Sphere{
-			Label: label,
-			Pose:  PoseAt(x, 0, 0, ox, oy, oz, theta),
+			Label:          label,
+			Pose:           PoseAt(x, 0, 0, ox, oy, oz, theta),
 			RadiusMM:       hostR,
 			Color:          &Color{R: 220, G: 220, B: 220},
 			Opacity:        ptr(0.35),
@@ -248,9 +248,9 @@ func referenceFrameDemo() []Item {
 	visuals = append(visuals, []Visual{
 		// Mesh — orbits with anchor AND spins on its own axis.
 		Mesh{Label: "spinning_frame_attached_mesh", ParentFrame: "spinning_frame",
-			Pose: PoseAt(700, 0, 0, 0, 0, 1, 0),
+			Pose:     PoseAt(700, 0, 0, 0, 0, 1, 0),
 			MeshPath: "assets/icosahedron.ply",
-			Color: &Color{R: 240, G: 200, B: 50}, Opacity: ptr(1.0),
+			Color:    &Color{R: 240, G: 200, B: 50}, Opacity: ptr(1.0),
 			Animation: Spin{PeriodS: 2}},
 		// Invisible wheel hub — adds its own spin on top of mesh +
 		// anchor. Tiny radius + opacity 0 keeps it invisible; we
@@ -315,18 +315,18 @@ func robotArm() []Item {
 			RadiusMM: jointR, Color: jointColor, Opacity: ptr(1.0)},
 		// Upper arm.
 		Capsule{Label: "arm_upper", ParentFrame: "arm_shoulder",
-			Pose: poseAt(0, 0, upperL/2),
+			Pose:     poseAt(0, 0, upperL/2),
 			RadiusMM: linkR, LengthMM: upperL,
 			Color: &Color{R: 100, G: 130, B: 200}, Opacity: ptr(1.0)},
 		// Elbow — bounded RoM.
 		Sphere{Label: "arm_elbow", ParentFrame: "arm_upper",
 			Pose:     PoseAt(0, 0, upperL/2+linkR, 0, 1, 0, -60),
 			RadiusMM: jointR * 0.8,
-			Color: jointColor, Opacity: ptr(1.0),
+			Color:    jointColor, Opacity: ptr(1.0),
 			Animation: Swing{AmplitudeDeg: 50.0, PeriodS: 5}},
 		// Forearm.
 		Capsule{Label: "arm_forearm", ParentFrame: "arm_elbow",
-			Pose: poseAt(0, 0, forearmL/2),
+			Pose:     poseAt(0, 0, forearmL/2),
 			RadiusMM: linkR * 0.85, LengthMM: forearmL,
 			Color: &Color{R: 100, G: 180, B: 110}, Opacity: ptr(1.0)},
 		// Wrist — rolls about the forearm; the 2-finger claw makes
@@ -334,24 +334,24 @@ func robotArm() []Item {
 		Sphere{Label: "arm_wrist", ParentFrame: "arm_forearm",
 			Pose:     poseAt(0, 0, forearmL/2+linkR*0.6),
 			RadiusMM: jointR * 0.65,
-			Color: jointColor, Opacity: ptr(1.0),
+			Color:    jointColor, Opacity: ptr(1.0),
 			Animation: Swing{AmplitudeDeg: 90.0, PeriodS: 6}},
 		// Claw palm.
 		Box{Label: "claw_palm", ParentFrame: "arm_wrist",
 			Pose:   poseAt(0, 0, jointR*0.6+palmThick/2),
 			DimsMM: BoxDims{X: 70, Y: 28, Z: palmThick},
-			Color: clawColor, Opacity: ptr(1.0)},
+			Color:  clawColor, Opacity: ptr(1.0)},
 		// Left finger.
 		Box{Label: "claw_left_finger", ParentFrame: "claw_palm",
 			Pose:   poseAt(-22, 0, palmThick/2+fingerL/2),
 			DimsMM: BoxDims{X: fingerThick, Y: fingerThick, Z: fingerL},
-			Color: clawColor, Opacity: ptr(1.0),
+			Color:  clawColor, Opacity: ptr(1.0),
 			Animation: Oscillate{Axis: "x", AmplitudeMM: -10.0, PeriodS: 3}},
 		// Right finger.
 		Box{Label: "claw_right_finger", ParentFrame: "claw_palm",
 			Pose:   poseAt(22, 0, palmThick/2+fingerL/2),
 			DimsMM: BoxDims{X: fingerThick, Y: fingerThick, Z: fingerL},
-			Color: clawColor, Opacity: ptr(1.0),
+			Color:  clawColor, Opacity: ptr(1.0),
 			Animation: Oscillate{Axis: "x", AmplitudeMM: 10.0, PeriodS: 3}},
 	)
 }
@@ -463,7 +463,7 @@ func geometryMorphPreset() []Item {
 	visuals = append(visuals, Box{
 		Label: "morph_stretch_box", Pose: poseAt(slotX, 0, 0),
 		DimsMM: BoxDims{X: 100, Y: 100, Z: 150},
-		Color: &Color{R: 100, G: 180, B: 230}, Opacity: ptr(1.0),
+		Color:  &Color{R: 100, G: 180, B: 230}, Opacity: ptr(1.0),
 		Animation: Pulse{Axis: "z", AmplitudeMM: 100, PeriodS: 4},
 	})
 	slotX += 350
@@ -518,8 +518,8 @@ func lifecycleDemoPreset() []Item {
 	for i := 0; i < count; i++ {
 		off := float64(i) / float64(count) * periodS
 		visuals = append(visuals, Box{
-			Label: fmt.Sprintf("lifecycle_%02d", i),
-			Pose:  poseAt((float64(i)-float64(count-1)/2.0)*sp, 0, 0),
+			Label:  fmt.Sprintf("lifecycle_%02d", i),
+			Pose:   poseAt((float64(i)-float64(count-1)/2.0)*sp, 0, 0),
 			DimsMM: BoxDims{X: 120, Y: 120, Z: 120},
 			// Color/Opacity overridden every tick by the lifecycle
 			// animation; static values are placeholders.

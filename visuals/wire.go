@@ -1,9 +1,9 @@
 // Wire-format parsers for the apply_events DoCommand verb.
 //
 // The Python driver serializes its Scene events via
-// ``viam_visuals.events_to_wire`` which produces a dict shape with
+// “viam_visuals.events_to_wire“ which produces a dict shape with
 // snake_case keys. The Go visualizer's apply_events receives those
-// dicts (as ``map[string]any``) and needs to turn them into
+// dicts (as “map[string]any“) and needs to turn them into
 // visuals.Item / paths to feed installItemLocked.
 //
 // We don't add JSON tags directly to Item / Pose / Color / Animation

@@ -25,32 +25,32 @@ var ValidUUIDStrategies = []string{"stable", "versioned"}
 // Config is the JSON-parsed attributes block. Pointer fields allow
 // us to distinguish "unset" from "zero value" where it matters.
 type Config struct {
-	TickHz       *float64       `json:"tick_hz,omitempty"`
-	UUIDStrategy string         `json:"uuid_strategy,omitempty"`
-	ParentFrame  string         `json:"parent_frame,omitempty"`
-	Preset       string         `json:"preset,omitempty"`
-	Items        []ItemConfig   `json:"items,omitempty"`
+	TickHz       *float64     `json:"tick_hz,omitempty"`
+	UUIDStrategy string       `json:"uuid_strategy,omitempty"`
+	ParentFrame  string       `json:"parent_frame,omitempty"`
+	Preset       string       `json:"preset,omitempty"`
+	Items        []ItemConfig `json:"items,omitempty"`
 }
 
 // ItemConfig is the JSON-parsed shape of one item.
 type ItemConfig struct {
-	Type            string           `json:"type"`
-	Label           string           `json:"label"`
-	ParentFrame     string           `json:"parent_frame,omitempty"`
-	Pose            *PoseJSON        `json:"pose,omitempty"`
-	DimsMM          *DimsJSON        `json:"dims_mm,omitempty"`
-	RadiusMM        *float64         `json:"radius_mm,omitempty"`
-	LengthMM        *float64         `json:"length_mm,omitempty"`
-	MeshPath        string           `json:"mesh_path,omitempty"`
-	RawSTL          bool             `json:"raw_stl,omitempty"`
-	PointcloudPath  string           `json:"pointcloud_path,omitempty"`
-	Color           *ColorJSON       `json:"color,omitempty"`
-	Opacity         *float64         `json:"opacity,omitempty"`
-	ShowAxesHelper  bool             `json:"show_axes_helper,omitempty"`
-	Invisible       bool             `json:"invisible,omitempty"`
-	Chunked         bool             `json:"chunked,omitempty"`
-	ChunkSize       int              `json:"chunk_size,omitempty"`
-	Animation       *AnimationJSON   `json:"animation,omitempty"`
+	Type           string         `json:"type"`
+	Label          string         `json:"label"`
+	ParentFrame    string         `json:"parent_frame,omitempty"`
+	Pose           *PoseJSON      `json:"pose,omitempty"`
+	DimsMM         *DimsJSON      `json:"dims_mm,omitempty"`
+	RadiusMM       *float64       `json:"radius_mm,omitempty"`
+	LengthMM       *float64       `json:"length_mm,omitempty"`
+	MeshPath       string         `json:"mesh_path,omitempty"`
+	RawSTL         bool           `json:"raw_stl,omitempty"`
+	PointcloudPath string         `json:"pointcloud_path,omitempty"`
+	Color          *ColorJSON     `json:"color,omitempty"`
+	Opacity        *float64       `json:"opacity,omitempty"`
+	ShowAxesHelper bool           `json:"show_axes_helper,omitempty"`
+	Invisible      bool           `json:"invisible,omitempty"`
+	Chunked        bool           `json:"chunked,omitempty"`
+	ChunkSize      int            `json:"chunk_size,omitempty"`
+	Animation      *AnimationJSON `json:"animation,omitempty"`
 }
 
 // PoseJSON: any subset of fields, missing default to 0 (with OZ=1).
@@ -436,4 +436,3 @@ func dirHas(dir, name string) bool {
 	info, err := os.Stat(filepath.Join(dir, name))
 	return err == nil && info.IsDir()
 }
-

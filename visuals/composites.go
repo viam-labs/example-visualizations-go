@@ -25,20 +25,20 @@ type Composite interface {
 // the parent-frame chain. The anchor's label is the user-supplied
 // Label; axes use Label + "_axis_x" / "_y" / "_z".
 type CoordinateFrame struct {
-	Label           string
-	Pose            Pose
-	SizeMM          float64
-	ParentFrame     string
-	Animation       AnimationSpec
-	ShowAxesHelper  bool
-	AnchorRadiusMM  float64
-	AxisRadiusMM    float64
-	AnchorColor     *Color
-	AnchorOpacity   *float64
-	AxisColorX      *Color
-	AxisColorY      *Color
-	AxisColorZ      *Color
-	AxisOpacity     *float64
+	Label          string
+	Pose           Pose
+	SizeMM         float64
+	ParentFrame    string
+	Animation      AnimationSpec
+	ShowAxesHelper bool
+	AnchorRadiusMM float64
+	AxisRadiusMM   float64
+	AnchorColor    *Color
+	AnchorOpacity  *float64
+	AxisColorX     *Color
+	AxisColorY     *Color
+	AxisColorZ     *Color
+	AxisOpacity    *float64
 }
 
 // ToVisuals expands the frame into [anchor, x, y, z].

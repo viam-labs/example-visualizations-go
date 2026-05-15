@@ -45,8 +45,8 @@ type VisualizerConfig struct {
 
 // Validate rejects the items/preset config that belongs on the
 // driver. Validate also enforces the same tick/strategy/frame
-// bounds the monolith uses, so the visualizer can't be wedged into
-// an unsupported state.
+// bounds the standalone-playground service uses, so the visualizer
+// can't be wedged into an unsupported state.
 func (c *VisualizerConfig) Validate(path string) ([]string, []string, error) {
 	if c.TickHz != nil {
 		if *c.TickHz <= 0 || *c.TickHz > 30 {
