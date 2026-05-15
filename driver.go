@@ -28,7 +28,7 @@ var DriverModel = resource.NewModel(
 )
 
 const (
-	DefaultDriverTickHz = 5.0
+	DefaultDriverTickHz = 30.0
 	MaxDriverTickHz     = 30.0
 	DefaultRecipe       = "marching_boxes"
 )
@@ -176,6 +176,15 @@ func (d *playgroundDriver) Reconfigure(
 	}
 	d.visualizer = wss
 
+	// Capture the prior scene before we overwrite d.scene. We'll
+	// push REMOVED events for its labels so the prior recipe's
+	// visuals disappear from the renderer before the new recipe's
+	// visuals appear. Without this, switching recipes (or even
+	// re-running the same recipe with different parameters) leaves
+	// the prior recipe's labels visible in the renderer alongside
+	// the new ones.
+	prevScene := d.scene
+
 	// Build fresh Scene from the recipe.
 	d.scene = visuals.NewScene("world")
 	initialEvents := d.recipe.Initial(d.scene)
@@ -186,6 +195,14 @@ func (d *playgroundDriver) Reconfigure(
 	d.tickCancel = cancel
 	d.tickDone = make(chan struct{})
 	d.mu.Unlock()
+
+	// Push REMOVED events for the prior scene's labels (if any), so
+	// switching recipes doesn't leave stale visuals in the renderer.
+	if prevScene != nil && prevScene.Len() > 0 {
+		if err := d.sendEvents(ctx, prevScene.Clear()); err != nil {
+			d.logger.Warnw("failed to clear prior scene", "err", err)
+		}
+	}
 
 	// Push initial scene synchronously so callers see state right away.
 	if err := d.sendEvents(ctx, initialEvents); err != nil {

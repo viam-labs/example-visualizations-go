@@ -195,6 +195,65 @@ func TestDriverVisualizerPipeline_TwoDriversNamespaced(t *testing.T) {
 	}
 }
 
+// ---- reconfigure clears prior scene -----------------------------------
+
+func TestDriverVisualizerPipeline_ReconfigureClearsPriorRecipeLabels(t *testing.T) {
+	clearRegistry()
+	defer clearRegistry()
+
+	vis := newVisualizer(t, "vis")
+	d := newDriver(t, "vis", "marching_boxes", 20, "")
+	defer d.Close(context.Background())
+
+	vis.Mu().Lock()
+	hasMarch := false
+	for k := range vis.State() {
+		if strings.HasPrefix(k, "march_") {
+			hasMarch = true
+			break
+		}
+	}
+	vis.Mu().Unlock()
+	if !hasMarch {
+		t.Fatal("expected march_* labels after initial reconfigure")
+	}
+
+	// Reconfigure to a different recipe.
+	tickHz := 20.0
+	cfg := &DriverConfig{
+		Visualizer: "vis",
+		Recipe:     "pulsing_spheres",
+		TickHz:     &tickHz,
+	}
+	conf := resource.Config{
+		Name:                "drv",
+		API:                 genericAPI,
+		Model:               DriverModel,
+		ConvertedAttributes: cfg,
+	}
+	if err := d.Reconfigure(context.Background(), nil, conf); err != nil {
+		t.Fatalf("reconfigure: %v", err)
+	}
+
+	vis.Mu().Lock()
+	defer vis.Mu().Unlock()
+	for k := range vis.State() {
+		if strings.HasPrefix(k, "march_") {
+			t.Errorf("march_* label still present after recipe switch: %v", k)
+		}
+	}
+	pulseCount := 0
+	for k := range vis.State() {
+		if strings.HasPrefix(k, "pulse_") {
+			pulseCount++
+		}
+	}
+	if pulseCount == 0 {
+		t.Errorf("expected pulse_* labels after recipe switch, got labels: %v",
+			keys(vis.State()))
+	}
+}
+
 // ---- DoCommand surface ----------------------------------------------
 
 func TestDriver_InfoCommand(t *testing.T) {
