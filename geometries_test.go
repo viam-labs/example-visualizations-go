@@ -6,13 +6,14 @@ import (
 	"strings"
 	"testing"
 
+	"exampleviz/visuals"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // ---- metadata schema (the load-bearing format) ---------------------
 
 func TestMetadataEmitsAllFiveRequiredKeys(t *testing.T) {
-	m := buildMetadata(MetadataOpts{
+	m := visuals.BuildMetadata(visuals.MetadataOpts{
 		Color:   &Color{R: 255, G: 0, B: 0},
 		Opacity: ptrF(0.5),
 	})
@@ -27,7 +28,7 @@ func TestMetadataEmitsAllFiveRequiredKeys(t *testing.T) {
 }
 
 func TestMetadataColorsIsBase64OfPackedRGB(t *testing.T) {
-	m := buildMetadata(MetadataOpts{Color: &Color{R: 10, G: 20, B: 30}})
+	m := visuals.BuildMetadata(visuals.MetadataOpts{Color: &Color{R: 10, G: 20, B: 30}})
 	colors := m.Fields["colors"].GetStringValue()
 	want := base64.StdEncoding.EncodeToString([]byte{10, 20, 30})
 	if colors != want {
@@ -36,7 +37,7 @@ func TestMetadataColorsIsBase64OfPackedRGB(t *testing.T) {
 }
 
 func TestMetadataOpacitiesIsBase64AlphaByte(t *testing.T) {
-	m := buildMetadata(MetadataOpts{Opacity: ptrF(0.5)})
+	m := visuals.BuildMetadata(visuals.MetadataOpts{Opacity: ptrF(0.5)})
 	ops := m.Fields["opacities"].GetStringValue()
 	// 0.5 * 255 = 127.5 → rounds to 128.
 	decoded, _ := base64.StdEncoding.DecodeString(ops)
@@ -46,11 +47,11 @@ func TestMetadataOpacitiesIsBase64AlphaByte(t *testing.T) {
 }
 
 func TestMetadataChunksOptional(t *testing.T) {
-	m := buildMetadata(MetadataOpts{Color: &Color{R: 0, G: 0, B: 0}, Opacity: ptrF(1.0)})
+	m := visuals.BuildMetadata(visuals.MetadataOpts{Color: &Color{R: 0, G: 0, B: 0}, Opacity: ptrF(1.0)})
 	if _, ok := m.Fields["chunks"]; ok {
 		t.Error("chunks should not be present when not set")
 	}
-	m = buildMetadata(MetadataOpts{
+	m = visuals.BuildMetadata(visuals.MetadataOpts{
 		Color:  &Color{R: 0, G: 0, B: 0},
 		Chunks: map[string]any{"chunk_size": 100.0, "total": 5.0},
 	})
@@ -64,7 +65,7 @@ func TestMetadataChunksOptional(t *testing.T) {
 }
 
 func TestMetadataColorFormatIsOne(t *testing.T) {
-	m := buildMetadata(MetadataOpts{})
+	m := visuals.BuildMetadata(visuals.MetadataOpts{})
 	cf := m.Fields["color_format"].GetNumberValue()
 	if cf != 1.0 {
 		t.Errorf("color_format = %v, want 1", cf)
@@ -72,7 +73,7 @@ func TestMetadataColorFormatIsOne(t *testing.T) {
 }
 
 func TestMetadataInvisibleShowAxesAreBools(t *testing.T) {
-	m := buildMetadata(MetadataOpts{ShowAxesHelper: true, Invisible: false})
+	m := visuals.BuildMetadata(visuals.MetadataOpts{ShowAxesHelper: true, Invisible: false})
 	if v := m.Fields["show_axes_helper"]; v.GetBoolValue() != true {
 		t.Errorf("show_axes_helper = %v", v)
 	}
@@ -124,8 +125,8 @@ func TestBuildPointUsesVisibleRadius(t *testing.T) {
 	if s == nil {
 		t.Fatal("expected sphere geometry")
 	}
-	if s.RadiusMm != PointMarkerRadiusMM {
-		t.Errorf("radius = %v, want %v", s.RadiusMm, PointMarkerRadiusMM)
+	if s.RadiusMm != visuals.PointMarkerRadiusMM {
+		t.Errorf("radius = %v, want %v", s.RadiusMm, visuals.PointMarkerRadiusMM)
 	}
 }
 
@@ -148,7 +149,7 @@ func TestBuildMeshRequiresPLY(t *testing.T) {
 }
 
 func TestInferMeshContentTypeRejectsUppercase(t *testing.T) {
-	if _, err := inferMeshContentType("model.PLY"); err == nil {
+	if _, err := visuals.InferMeshContentType("model.PLY"); err == nil {
 		// Lowercase enforcement happens via ToLower in the implementation;
 		// uppercase actually gets lowercased and accepted. That's a
 		// difference from the Python module's behavior, but the renderer
@@ -156,7 +157,7 @@ func TestInferMeshContentTypeRejectsUppercase(t *testing.T) {
 		// to document the difference; don't fail.
 		_ = err
 	}
-	if _, err := inferMeshContentType("model.glb"); err == nil {
+	if _, err := visuals.InferMeshContentType("model.glb"); err == nil {
 		t.Error("glb should be rejected")
 	}
 }
@@ -196,7 +197,7 @@ func itoa(n int) string {
 
 func TestParsePCDBinary(t *testing.T) {
 	pcd := fakePCD(100)
-	header, body, stride, total, err := parsePCDBinary(pcd)
+	header, body, stride, total, err := visuals.ParsePCDBinary(pcd)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,11 +217,11 @@ func TestParsePCDBinary(t *testing.T) {
 
 func TestBuildPCDChunkRewritesWidthAndPoints(t *testing.T) {
 	pcd := fakePCD(50)
-	header, body, stride, _, err := parsePCDBinary(pcd)
+	header, body, stride, _, err := visuals.ParsePCDBinary(pcd)
 	if err != nil {
 		t.Fatal(err)
 	}
-	chunk, err := buildPCDChunk(header, body, stride, 0, 20)
+	chunk, err := visuals.BuildPCDChunk(header, body, stride, 0, 20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +232,7 @@ func TestBuildPCDChunkRewritesWidthAndPoints(t *testing.T) {
 		t.Error("chunk should have POINTS 20")
 	}
 	// Body length should be 20 * 16 = 320 bytes past the header.
-	_, chunkBody, _, chunkTotal, err := parsePCDBinary(chunk)
+	_, chunkBody, _, chunkTotal, err := visuals.ParsePCDBinary(chunk)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,8 +243,8 @@ func TestBuildPCDChunkRewritesWidthAndPoints(t *testing.T) {
 
 func TestBuildPCDChunkLastPartial(t *testing.T) {
 	pcd := fakePCD(25)
-	header, body, stride, _, _ := parsePCDBinary(pcd)
-	chunk, err := buildPCDChunk(header, body, stride, 2, 10)
+	header, body, stride, _, _ := visuals.ParsePCDBinary(pcd)
+	chunk, err := visuals.BuildPCDChunk(header, body, stride, 2, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,8 +255,8 @@ func TestBuildPCDChunkLastPartial(t *testing.T) {
 
 func TestBuildPCDChunkOutOfRange(t *testing.T) {
 	pcd := fakePCD(10)
-	header, body, stride, _, _ := parsePCDBinary(pcd)
-	if _, err := buildPCDChunk(header, body, stride, 5, 10); err == nil {
+	header, body, stride, _, _ := visuals.ParsePCDBinary(pcd)
+	if _, err := visuals.BuildPCDChunk(header, body, stride, 5, 10); err == nil {
 		t.Error("expected out-of-range error")
 	}
 }

@@ -33,6 +33,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"exampleviz/visuals"
 	commonpb "go.viam.com/api/common/v1"
 	wsspb "go.viam.com/api/service/worldstatestore/v1"
 	"go.viam.com/rdk/logging"
@@ -268,7 +269,7 @@ func (s *sceneSprites) installItemLocked(item Item) error {
 		if err != nil {
 			return fmt.Errorf("read pointcloud %s: %w", path, err)
 		}
-		header, body, stride, total, err := parsePCDBinary(full)
+		header, body, stride, total, err := visuals.ParsePCDBinary(full)
 		if err != nil {
 			return fmt.Errorf("parse PCD %s: %w", path, err)
 		}
@@ -277,7 +278,7 @@ func (s *sceneSprites) installItemLocked(item Item) error {
 			chunkSize = 1000
 		}
 		nChunks := (total + chunkSize - 1) / chunkSize
-		firstChunk, err := buildPCDChunk(header, body, stride, 0, chunkSize)
+		firstChunk, err := visuals.BuildPCDChunk(header, body, stride, 0, chunkSize)
 		if err != nil {
 			return err
 		}
@@ -386,7 +387,7 @@ func buildGeometryForItem(item Item, geom BaseGeom) (*commonpb.Geometry, error) 
 		if item.RawSTL {
 			return buildMesh(raw, "stl", item.Label, true)
 		}
-		ply, err := loadMeshBytesAsPLY(raw, item.MeshPath)
+		ply, err := visuals.LoadMeshBytesAsPLY(raw, item.MeshPath)
 		if err != nil {
 			return nil, err
 		}
@@ -418,9 +419,9 @@ func buildTransform(
 	// with embedded per-vertex colors, transcode them into metadata.colors.
 	var vertexColors [][3]int
 	if item.Color == nil && geom != nil && geom.GetMesh() != nil {
-		vertexColors = extractPLYVertexColors(geom.GetMesh().Mesh)
+		vertexColors = visuals.ExtractPLYVertexColors(geom.GetMesh().Mesh)
 	}
-	md := buildMetadata(MetadataOpts{
+	md := visuals.BuildMetadata(visuals.MetadataOpts{
 		Color:          item.Color,
 		Opacity:        item.Opacity,
 		ShowAxesHelper: item.ShowAxesHelper,
@@ -810,7 +811,7 @@ func (s *sceneSprites) doGetEntityChunk(command map[string]any) (map[string]any,
 		return nil, fmt.Errorf("entity %q is not chunked", target.item.Label)
 	}
 	cs := target.chunkedState
-	chunkPCD, err := buildPCDChunk(cs.headerBytes, cs.bodyBytes, cs.stride, chunkIdx, cs.chunkSizePoints)
+	chunkPCD, err := visuals.BuildPCDChunk(cs.headerBytes, cs.bodyBytes, cs.stride, chunkIdx, cs.chunkSizePoints)
 	if err != nil {
 		return nil, err
 	}

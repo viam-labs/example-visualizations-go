@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"exampleviz/visuals"
 )
 
 // ---- attribute names / defaults --------------------------------------
@@ -361,7 +363,7 @@ func validateItem(it ItemConfig, path string, idx int) error {
 		if it.MeshPath == "" {
 			return fmt.Errorf("%s mesh requires 'mesh_path'", where)
 		}
-		meshFmt, err := inferMeshContentType(it.MeshPath)
+		meshFmt, err := visuals.InferMeshContentType(it.MeshPath)
 		if err != nil {
 			return fmt.Errorf("%s %w", where, err)
 		}
