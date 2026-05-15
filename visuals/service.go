@@ -138,6 +138,23 @@ type SceneServiceBase struct {
 	tickHz       float64
 	uuidStrategy string
 	parentFrame  string
+
+	// Diagnostic counters surfaced in the debug snapshot. Atomic
+	// reads aren't needed because all mutations occur under s.mu.
+	broadcastsTotal int64
+	updatesTotal    int64
+	lastBroadcast   broadcastDebug
+}
+
+// broadcastDebug captures the most recent broadcast for debugging
+// via the {} debug DoCommand. Cheap (the kind is a uint8 and the
+// paths are at most a few short strings) and only updated on
+// broadcastLocked which already runs under s.mu.
+type broadcastDebug struct {
+	Kind         string
+	Label        string
+	Paths        []string
+	HasTransform bool
 }
 
 // ReconfigureWith does the SceneServiceBase reconfigure. Takes the
@@ -423,6 +440,20 @@ func (s *SceneServiceBase) StreamTransformChanges(ctx context.Context, _ map[str
 }
 
 func (s *SceneServiceBase) broadcastLocked(c worldstatestore.TransformChange) {
+	s.broadcastsTotal++
+	if c.ChangeType == wsspb.TransformChangeType_TRANSFORM_CHANGE_TYPE_UPDATED {
+		s.updatesTotal++
+	}
+	label := ""
+	if c.Transform != nil {
+		label = c.Transform.GetReferenceFrame()
+	}
+	s.lastBroadcast = broadcastDebug{
+		Kind:         c.ChangeType.String(),
+		Label:        label,
+		Paths:        append([]string(nil), c.UpdatedFields...),
+		HasTransform: c.Transform != nil,
+	}
 	for _, ch := range s.subscribers {
 		select {
 		case ch <- c:
@@ -719,6 +750,14 @@ func (s *SceneServiceBase) DoCommand(ctx context.Context, command map[string]any
 		"item_count":       len(s.state),
 		"subscriber_count": len(s.subscribers),
 		"tick_running":     s.tickStop != nil,
+		"broadcasts_total": s.broadcastsTotal,
+		"updates_total":    s.updatesTotal,
+		"last_broadcast": map[string]any{
+			"kind":          s.lastBroadcast.Kind,
+			"label":         s.lastBroadcast.Label,
+			"paths":         s.lastBroadcast.Paths,
+			"has_transform": s.lastBroadcast.HasTransform,
+		},
 	}, nil
 }
 
