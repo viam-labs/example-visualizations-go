@@ -217,29 +217,9 @@ func (a *AnimationJSON) toAnimation() Animation {
 	return out
 }
 
-// Item is the internal (denormalized) item representation used by
-// the service after a config has been parsed. ItemConfig.toItem()
-// produces this.
-type Item struct {
-	Type           string
-	Label          string
-	ParentFrame    string
-	Pose           Pose
-	DimsMM         BoxDims
-	HasDims        bool
-	RadiusMM       float64
-	LengthMM       float64
-	MeshPath       string
-	RawSTL         bool
-	PointcloudPath string
-	Color          *Color
-	Opacity        *float64
-	ShowAxesHelper bool
-	Invisible      bool
-	Chunked        bool
-	ChunkSize      int
-	Animation      Animation
-}
+// Item has moved to the visuals subpackage; the alias in aliases.go
+// keeps unqualified references working. ItemConfig.toItem() produces
+// the same struct, now living in the library namespace.
 
 func (ic ItemConfig) toItem() Item {
 	out := Item{

@@ -41,10 +41,8 @@ const PointMarkerRadiusMM = 8.0
 
 // ---- color / opacity / metadata --------------------------------------
 
-// Color is a 0..255 RGB triple.
-type Color struct {
-	R, G, B int
-}
+// Color has moved to the visuals subpackage; the alias in aliases.go
+// keeps unqualified references working.
 
 // clampU8 clamps any integer into 0..255.
 func clampU8(v int) int {
@@ -204,24 +202,9 @@ func buildMetadata(opts MetadataOpts) *structpb.Struct {
 
 // ---- pose ------------------------------------------------------------
 
-// Pose is the JSON-shape pose dict (mm + orientation vector + theta).
-type Pose struct {
-	X, Y, Z       float64
-	OX, OY, OZ    float64
-	Theta         float64
-	hasOrient     bool // tracks whether OX/OY/OZ were explicitly set
-}
-
-// IdentityPose returns a zero-pose with OZ=1 (identity orientation
-// vector in Viam's convention).
-func IdentityPose() Pose {
-	return Pose{OZ: 1.0}
-}
-
-// PoseXYZ is a convenience constructor.
-func PoseXYZ(x, y, z float64) Pose {
-	return Pose{X: x, Y: y, Z: z, OZ: 1.0}
-}
+// Pose, IdentityPose, and PoseXYZ have moved to the visuals
+// subpackage; the alias re-exports in aliases.go keep unqualified
+// references working.
 
 // buildPose converts the JSON-shape Pose to commonpb.Pose. If the
 // caller didn't set any of OX/OY/OZ, we default OZ=1 (identity).

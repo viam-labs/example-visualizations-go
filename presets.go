@@ -259,7 +259,7 @@ func referenceFrameDemo() []Item {
 			Color: &Color{R: 0, G: 130, B: 200}, Opacity: ptr(1.0)},
 		// Mesh — orbits with anchor AND spins on its own axis.
 		Mesh{Label: "spinning_frame_attached_mesh", ParentFrame: "spinning_frame",
-			Pose: Pose{X: 700, OZ: 1, hasOrient: true},
+			Pose: PoseAt(700, 0, 0, 0, 0, 1, 0),
 			MeshPath: "assets/icosahedron.ply",
 			Color: &Color{R: 240, G: 200, B: 50}, Opacity: ptr(1.0),
 			Animation: Spin{PeriodS: 2}},

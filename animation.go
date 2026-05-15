@@ -16,97 +16,11 @@ import (
 	"math"
 )
 
-// Field-mask path constants — single source of truth for the
-// camelCase paths the viewer honors today.
-const (
-	PathTheta         = "poseInObserverFrame.pose.theta"
-	PathX             = "poseInObserverFrame.pose.x"
-	PathY             = "poseInObserverFrame.pose.y"
-	PathZ             = "poseInObserverFrame.pose.z"
-	PathOX            = "poseInObserverFrame.pose.oX"
-	PathOY            = "poseInObserverFrame.pose.oY"
-	PathOZ            = "poseInObserverFrame.pose.oZ"
-	PathSphereRadius  = "physicalObject.geometryType.value.radiusMm"
-	PathCapsuleRadius = "physicalObject.geometryType.value.radiusMm"
-	PathCapsuleLength = "physicalObject.geometryType.value.lengthMm"
-	PathBoxDimsX      = "physicalObject.geometryType.value.dimsMm.x"
-	PathBoxDimsY      = "physicalObject.geometryType.value.dimsMm.y"
-	PathBoxDimsZ      = "physicalObject.geometryType.value.dimsMm.z"
-	PathMetadataColor = "metadata.color"
-	PathMetadataOpac  = "metadata.opacity"
-)
-
-// SupportedModes — closed set of valid animation.mode values.
-var SupportedModes = []string{
-	"none", "orbit", "oscillate", "spin", "swing", "pulse", "trajectory",
-	"force_vector", "breathe", "flicker", "lifecycle",
-}
-
-// SupportedAxes — for modes that take an axis parameter.
-var SupportedAxes = []string{"x", "y", "z"}
-
-// Lifecycle convention colors from the official worldstatestore
-// guide: blue@50% opacity (appearing), orange@100% (alive),
-// red@50% (disappearing), then REMOVED (gone).
-var (
-	LifecycleColorAppearing    = Color{R: 66, G: 165, B: 245}
-	LifecycleColorAlive        = Color{R: 255, G: 152, B: 0}
-	LifecycleColorDisappearing = Color{R: 244, G: 67, B: 54}
-	LifecycleOpacityAppearing  = 0.5
-	LifecycleOpacityAlive      = 1.0
-	LifecycleOpacityDispearing = 0.5
-)
-
-// Animation is the per-item animation config (Item.Animation).
-type Animation struct {
-	Mode string
-	// Pose-based modes.
-	RadiusMM     float64
-	AmplitudeMM  float64
-	PeriodS      float64
-	Axis         string
-	AmplitudeDeg float64
-	// trajectory
-	Waypoints []Pose
-	DurationS float64
-	Loop      bool // default true
-	// force_vector
-	LengthAmplitudeMM float64
-	RadiusAmplitudeMM float64
-	TiltDeg           float64
-	PrecessionSpeed   float64
-	ColorSpeed        float64
-	// breathe
-	Amplitude float64
-	// flicker
-	DutyCycle         float64
-	PhaseOffsetS      float64
-	RotateUUIDOnReadd *bool // pointer so we can distinguish "unset" (default true) from "false"
-	// lifecycle
-	AppearS    float64
-	AliveS     float64
-	DisappearS float64
-	GoneS      float64
-	// Internal: explicit value tracking.
-	HasLoop bool
-}
-
-// IsAnimated returns true iff the animation should tick.
-func IsAnimated(a Animation) bool {
-	return a.Mode != "" && a.Mode != "none"
-}
-
-// Overrides bundles per-tick metadata overrides emitted by certain
-// animation modes (force_vector emits color; breathe emits opacity;
-// flicker / lifecycle emit InScene; lifecycle emits all three).
-type Overrides struct {
-	Color   *Color
-	Opacity *float64
-	InScene *bool // nil = no scene-graph mutation; ptr = explicit in_scene
-}
-
-// BoxDims holds the box dims dict.
-type BoxDims struct{ X, Y, Z float64 }
+// The path constants, SupportedModes, lifecycle convention colors,
+// Animation, IsAnimated, Overrides, and BoxDims types have moved to
+// the `visuals` subpackage. This file now just hosts the tick code
+// that consumes them. See aliases.go for the unqualified re-exports
+// that keep the rest of the package's references working.
 
 // BaseGeom holds the shape-specific base dim/radius/length fields.
 // Only one set of fields is meaningful per shape type. The
