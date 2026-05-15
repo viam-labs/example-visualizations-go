@@ -30,7 +30,6 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"exampleviz/visuals"
@@ -95,20 +94,12 @@ type sceneSprites struct {
 	parentFrame  string
 }
 
-// Versioned-UUID counter; monotonic across the process so collisions
-// within the same millisecond can't happen.
-var versionedCounter int64
-
-func versionedUUID(label string) []byte {
-	c := atomic.AddInt64(&versionedCounter, 1)
-	return []byte(fmt.Sprintf("%s_%d_%d", label, time.Now().UnixMilli(), c))
-}
-
+// UUID generation moved to visuals.InitialUUID / visuals.VersionedUUID.
+// Thin local wrappers keep existing call sites unchanged while the
+// rest of the SceneServiceBase extraction lands.
+func versionedUUID(label string) []byte { return visuals.VersionedUUID(label) }
 func initialUUID(label, strategy string) []byte {
-	if strategy == "versioned" {
-		return versionedUUID(label)
-	}
-	return []byte(label)
+	return visuals.InitialUUID(label, strategy)
 }
 
 func newSceneSprites(
