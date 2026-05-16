@@ -11,11 +11,11 @@ import (
 
 // ---- registry ---------------------------------------------------------
 
-func TestRecipes_ContainsAllSeven(t *testing.T) {
+func TestRecipes_ContainsAllEight(t *testing.T) {
 	want := []string{
-		"all_primitives", "coordinate_frames_arm", "detections_overlay",
-		"lifecycle_garden", "marching_boxes", "pulsing_spheres",
-		"trajectory_runner",
+		"all", "all_primitives", "coordinate_frames_arm",
+		"detections_overlay", "lifecycle_garden", "marching_boxes",
+		"pulsing_spheres", "trajectory_runner",
 	}
 	got := make([]string, 0, len(Recipes))
 	for k := range Recipes {
@@ -404,6 +404,103 @@ func TestLifecycleGarden_ColorChangesThroughPhases(t *testing.T) {
 	}
 	if aliveColor == nil || *aliveColor != lgColorAlive {
 		t.Errorf("expected alive color %v, got %v", lgColorAlive, aliveColor)
+	}
+}
+
+// ---- y_origin parameter ----------------------------------------------
+
+func TestYOrigin_ShiftsMarchingBoxes(t *testing.T) {
+	scene := visuals.NewScene("world")
+	MarchingBoxes{YOrigin: -1500}.Initial(scene)
+	v := scene.Get("march_0")
+	box, ok := v.(*visuals.Box)
+	if !ok {
+		t.Fatalf("expected *Box, got %T", v)
+	}
+	if box.Pose.Y != -1500 {
+		t.Errorf("expected y=-1500, got %v", box.Pose.Y)
+	}
+}
+
+func TestYOrigin_ShiftsCoordinateFramesArm(t *testing.T) {
+	scene := visuals.NewScene("world")
+	CoordinateFramesArm{YOrigin: 1000}.Initial(scene)
+	// Frame anchor at YOrigin + cfFrameY (= 600).
+	frame := scene.Get("frame_0")
+	if frame == nil {
+		t.Fatal("frame_0 missing")
+	}
+	// Composite-stored as value-typed Sphere.
+	if sphere, ok := frame.(visuals.Sphere); ok {
+		if sphere.Pose.Y != 1600 {
+			t.Errorf("frame_0.y = %v, want 1600", sphere.Pose.Y)
+		}
+	} else if psphere, ok := frame.(*visuals.Sphere); ok {
+		if psphere.Pose.Y != 1600 {
+			t.Errorf("frame_0.y = %v, want 1600", psphere.Pose.Y)
+		}
+	} else {
+		t.Fatalf("frame_0 wrong type: %T", frame)
+	}
+}
+
+// ---- all recipe -------------------------------------------------------
+
+func TestAllRecipe_RunsEverySubRecipe(t *testing.T) {
+	scene := visuals.NewScene("world")
+	ar := newAllRecipe()
+	ar.Initial(scene)
+	labels := scene.Labels()
+	expected := []string{
+		"march_0", "pulse_0", "demo_box",
+		"frame_0", "arm_shoulder", "wp_0", "trajectory_runner",
+	}
+	for _, want := range expected {
+		found := false
+		for _, l := range labels {
+			if l == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("`all` scene missing %q (have %v)", want, labels)
+		}
+	}
+}
+
+func TestAllRecipe_SubRecipesDontOverlapInY(t *testing.T) {
+	scene := visuals.NewScene("world")
+	ar := newAllRecipe()
+	ar.Initial(scene)
+	march := scene.Get("march_0").(*visuals.Box)
+	pulse := scene.Get("pulse_0").(*visuals.Sphere)
+	diff := march.Pose.Y - pulse.Pose.Y
+	if diff < 0 {
+		diff = -diff
+	}
+	if diff < 500 {
+		t.Errorf("expected sub-recipes spaced >= 500mm apart, got |Δy|=%v", diff)
+	}
+}
+
+func TestAllRecipe_TickAnimatesEverySubRecipe(t *testing.T) {
+	scene := visuals.NewScene("world")
+	ar := newAllRecipe()
+	ar.Initial(scene)
+	events := ar.Tick(scene, 0.5)
+	hasPrefix := func(prefix string) bool {
+		for _, e := range events {
+			if strings.HasPrefix(e.Label, prefix) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, prefix := range []string{"march_", "pulse_", "det_", "trajectory_runner"} {
+		if !hasPrefix(prefix) {
+			t.Errorf("expected an event with prefix %q in tick output", prefix)
+		}
 	}
 }
 

@@ -27,7 +27,11 @@ type Recipe interface {
 
 // MarchingBoxes — five boxes in a row, each bobbing in Y on a sine wave.
 // Simplest possible recipe; proves the pipeline end-to-end.
-type MarchingBoxes struct{}
+//
+// YOrigin shifts the row along Y for use in the "all" recipe.
+type MarchingBoxes struct {
+	YOrigin float64
+}
 
 func (MarchingBoxes) Name() string { return "marching_boxes" }
 
@@ -45,7 +49,7 @@ func (mb MarchingBoxes) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 		c := rainbow(float64(i) / mbCount)
 		box := &visuals.Box{
 			Label:  marchingLabel(i),
-			Pose:   visuals.Pose{X: x, Z: 100},
+			Pose:   visuals.Pose{X: x, Y: mb.YOrigin, Z: 100},
 			DimsMM: visuals.BoxDims{X: 120, Y: 120, Z: 120},
 			Color:  &c,
 		}
@@ -71,7 +75,7 @@ func (mb MarchingBoxes) Tick(scene *visuals.Scene, t float64) []visuals.SceneEve
 		x := (float64(i) - float64(mbCount-1)/2) * mbSpacing
 		phase := 2 * math.Pi * float64(i) / float64(mbCount)
 		y := mbAmplitude * math.Sin(2*math.Pi*t/mbPeriodS+phase)
-		box.Pose = visuals.Pose{X: x, Y: y, Z: 100}
+		box.Pose = visuals.Pose{X: x, Y: mb.YOrigin + y, Z: 100}
 		events, err := scene.Update(box)
 		if err == nil {
 			out = append(out, events...)
@@ -88,7 +92,9 @@ func marchingLabel(i int) string {
 // sine waves. Exercises a different field-mask path
 // (physicalObject.geometryType.value.radiusMm) and confirms the
 // visualizer rebuilds the geometry proto, not just the pose.
-type PulsingSpheres struct{}
+type PulsingSpheres struct {
+	YOrigin float64
+}
 
 func (PulsingSpheres) Name() string { return "pulsing_spheres" }
 
@@ -107,7 +113,7 @@ func (ps PulsingSpheres) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 		c := rainbow(0.7 * float64(i) / float64(max1(psCount-1)))
 		sp := &visuals.Sphere{
 			Label:    pulsingLabel(i),
-			Pose:     visuals.Pose{X: x, Z: 120},
+			Pose:     visuals.Pose{X: x, Y: ps.YOrigin, Z: 120},
 			RadiusMM: psRBase,
 			Color:    &c,
 		}
@@ -158,14 +164,17 @@ func pulsingLabel(i int) string {
 // and visualizer ship from the same module binary (the default with
 // the in-process registry), the visualizer's ReadAsset hook finds
 // the assets in the module's installed directory.
-type AllPrimitives struct{}
+type AllPrimitives struct {
+	YOrigin float64
+}
 
 func (AllPrimitives) Name() string { return "all_primitives" }
 
 const apSpacing = 280.0
 
-func (AllPrimitives) Initial(scene *visuals.Scene) []visuals.SceneEvent {
+func (ap AllPrimitives) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 	z := 100.0
+	y := ap.YOrigin
 	red := visuals.Color{R: 230, G: 25, B: 75}
 	green := visuals.Color{R: 60, G: 180, B: 75}
 	blue := visuals.Color{R: 0, G: 130, B: 200}
@@ -176,44 +185,44 @@ func (AllPrimitives) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 	items := []interface{}{
 		&visuals.Box{
 			Label:  "demo_box",
-			Pose:   visuals.Pose{X: -3 * apSpacing, Z: z},
+			Pose:   visuals.Pose{X: -3 * apSpacing, Y: y, Z: z},
 			DimsMM: visuals.BoxDims{X: 140, Y: 140, Z: 140},
 			Color:  &red,
 		},
 		&visuals.Sphere{
 			Label:    "demo_sphere",
-			Pose:     visuals.Pose{X: -2 * apSpacing, Z: z},
+			Pose:     visuals.Pose{X: -2 * apSpacing, Y: y, Z: z},
 			RadiusMM: 80,
 			Color:    &green,
 		},
 		&visuals.Capsule{
 			Label:    "demo_capsule",
-			Pose:     visuals.Pose{X: -1 * apSpacing, Z: z},
+			Pose:     visuals.Pose{X: -1 * apSpacing, Y: y, Z: z},
 			RadiusMM: 40,
 			LengthMM: 200,
 			Color:    &blue,
 		},
 		&visuals.Point{
 			Label: "demo_point",
-			Pose:  visuals.Pose{Z: z},
+			Pose:  visuals.Pose{Y: y, Z: z},
 			Color: &orange,
 		},
 		&visuals.Arrow{
 			Label:    "demo_arrow",
-			Pose:     visuals.Pose{X: 1 * apSpacing, Z: z},
+			Pose:     visuals.Pose{X: 1 * apSpacing, Y: y, Z: z},
 			LengthMM: 240,
 			RadiusMM: 20,
 			Color:    &purple,
 		},
 		&visuals.Mesh{
 			Label:    "demo_bunny",
-			Pose:     visuals.Pose{X: 2 * apSpacing, Z: z},
+			Pose:     visuals.Pose{X: 2 * apSpacing, Y: y, Z: z},
 			MeshPath: "assets/bunny.stl",
 			Color:    &cyan,
 		},
 		&visuals.PointCloud{
 			Label:          "demo_pcd",
-			Pose:           visuals.Pose{X: 3 * apSpacing, Z: z},
+			Pose:           visuals.Pose{X: 3 * apSpacing, Y: y, Z: z},
 			PointcloudPath: "assets/helix.pcd",
 		},
 	}
@@ -246,7 +255,9 @@ func (AllPrimitives) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent 
 // composite's Pose directly today. Solid is the right choice here;
 // wireframe is a future direction once an anchor-frame pattern is
 // wired into the recipe.
-type DetectionsOverlay struct{}
+type DetectionsOverlay struct {
+	YOrigin float64
+}
 
 func (DetectionsOverlay) Name() string { return "detections_overlay" }
 
@@ -264,13 +275,13 @@ func (DetectionsOverlay) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 	return nil
 }
 
-func (DetectionsOverlay) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+func (do DetectionsOverlay) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
 	out := []visuals.SceneEvent{}
 	for i := 0; i < doDetections; i++ {
 		phase := 2 * math.Pi * float64(i) / float64(doDetections)
 		angle := 2*math.Pi*t/doOrbitPeriodS + phase
 		x := doOrbitRadiusMM * math.Cos(angle)
-		y := doOrbitRadiusMM * math.Sin(angle)
+		y := do.YOrigin + doOrbitRadiusMM*math.Sin(angle)
 		z := 200.0
 		c := rainbow(float64(i) / float64(doDetections))
 		opacity := 0.4
@@ -302,7 +313,9 @@ func detectionLabel(i int) string {
 //
 // All animation is computed client-side: only joint angles change
 // per tick. The static parent-frame offsets stay fixed.
-type CoordinateFramesArm struct{}
+type CoordinateFramesArm struct {
+	YOrigin float64
+}
 
 func (CoordinateFramesArm) Name() string { return "coordinate_frames_arm" }
 
@@ -324,14 +337,14 @@ const (
 var cfFrameXs = []float64{-400, 0, 400}
 var cfFramePeriods = []float64{4.0, 5.5, 7.0}
 
-func (CoordinateFramesArm) Initial(scene *visuals.Scene) []visuals.SceneEvent {
+func (cf CoordinateFramesArm) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 	out := []visuals.SceneEvent{}
 
 	// Three coordinate-frame triads.
 	for i, x := range cfFrameXs {
 		frame := visuals.CoordinateFrame{
 			Label:  fmt.Sprintf("frame_%d", i),
-			Pose:   visuals.Pose{X: x, Y: cfFrameY, Z: 200},
+			Pose:   visuals.Pose{X: x, Y: cf.YOrigin + cfFrameY, Z: 200},
 			SizeMM: cfFrameSizeMM,
 		}
 		events, err := scene.Add(frame)
@@ -351,7 +364,7 @@ func (CoordinateFramesArm) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 	armItems := []interface{}{
 		&visuals.Sphere{
 			Label:    "arm_shoulder",
-			Pose:     visuals.Pose{X: cfArmBaseX, Y: cfArmBaseY, Z: cfArmBaseZ},
+			Pose:     visuals.Pose{X: cfArmBaseX, Y: cf.YOrigin + cfArmBaseY, Z: cfArmBaseZ},
 			RadiusMM: 45, Color: &gray,
 		},
 		&visuals.Capsule{
@@ -386,7 +399,7 @@ func (CoordinateFramesArm) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 	return out
 }
 
-func (CoordinateFramesArm) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+func (cf CoordinateFramesArm) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
 	out := []visuals.SceneEvent{}
 	gray := visuals.Color{R: 120, G: 120, B: 120}
 	green := visuals.Color{R: 100, G: 230, B: 100}
@@ -403,7 +416,7 @@ func (CoordinateFramesArm) Tick(scene *visuals.Scene, t float64) []visuals.Scene
 		theta := math.Mod(360.0*t/cfFramePeriods[i], 360.0)
 		frame := visuals.CoordinateFrame{
 			Label:  fmt.Sprintf("frame_%d", i),
-			Pose:   visuals.Pose{X: x, Y: cfFrameY, Z: 200, Theta: theta},
+			Pose:   visuals.Pose{X: x, Y: cf.YOrigin + cfFrameY, Z: 200, Theta: theta},
 			SizeMM: cfFrameSizeMM,
 		}
 		if events, err := scene.AddOrUpdate(frame); err == nil {
@@ -415,7 +428,7 @@ func (CoordinateFramesArm) Tick(scene *visuals.Scene, t float64) []visuals.Scene
 	shoulder := &visuals.Sphere{
 		Label: "arm_shoulder",
 		Pose: visuals.Pose{
-			X: cfArmBaseX, Y: cfArmBaseY, Z: cfArmBaseZ,
+			X: cfArmBaseX, Y: cf.YOrigin + cfArmBaseY, Z: cfArmBaseZ,
 			OY: 1, Theta: shoulderTheta,
 		},
 		RadiusMM: 45, Color: &gray,
@@ -454,9 +467,20 @@ func (CoordinateFramesArm) Tick(scene *visuals.Scene, t float64) []visuals.Scene
 // TrajectoryRunner — a "runner" sphere walking through a list of
 // waypoints with linear interpolation. The waypoints and the line
 // connecting them are static; only the runner's pose changes per tick.
-type TrajectoryRunner struct{}
+type TrajectoryRunner struct {
+	YOrigin float64
+}
 
 func (TrajectoryRunner) Name() string { return "trajectory_runner" }
+
+// trShifted returns trWaypoints with YOrigin applied.
+func (tr TrajectoryRunner) waypoints() []visuals.Pose {
+	out := make([]visuals.Pose, len(trWaypoints))
+	for i, wp := range trWaypoints {
+		out[i] = visuals.Pose{X: wp.X, Y: wp.Y + tr.YOrigin, Z: wp.Z, OZ: wp.OZ}
+	}
+	return out
+}
 
 const (
 	trLapPeriodS = 8.0
@@ -470,13 +494,14 @@ var trWaypoints = []visuals.Pose{
 	{X: 400, Y: 300, Z: 100, OZ: 1},
 }
 
-func (TrajectoryRunner) Initial(scene *visuals.Scene) []visuals.SceneEvent {
+func (tr TrajectoryRunner) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 	out := []visuals.SceneEvent{}
+	wps := tr.waypoints()
 
 	// Translucent static waypoint markers.
 	wpColor := visuals.Color{R: 120, G: 180, B: 220}
 	wpOpacity := 0.4
-	for i, wp := range trWaypoints {
+	for i, wp := range wps {
 		marker := &visuals.Sphere{
 			Label:    fmt.Sprintf("wp_%d", i),
 			Pose:     wp,
@@ -492,7 +517,7 @@ func (TrajectoryRunner) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 	lineOpacity := 0.5
 	line := visuals.Line{
 		LabelPrefix: "trajectory",
-		Points:      append([]visuals.Pose(nil), trWaypoints...),
+		Points:      wps,
 		WidthMM:     6,
 		Color:       &lineColor,
 		Opacity:     &lineOpacity,
@@ -505,7 +530,7 @@ func (TrajectoryRunner) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 	runnerColor := visuals.Color{R: 255, G: 200, B: 50}
 	runner := &visuals.Sphere{
 		Label:          "trajectory_runner",
-		Pose:           trWaypoints[0],
+		Pose:           wps[0],
 		RadiusMM:       55,
 		Color:          &runnerColor,
 		ShowAxesHelper: true,
@@ -516,14 +541,15 @@ func (TrajectoryRunner) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 	return out
 }
 
-func (TrajectoryRunner) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
-	n := len(trWaypoints)
+func (tr TrajectoryRunner) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+	wps := tr.waypoints()
+	n := len(wps)
 	nSegs := n // LOOP=true: wrap back to wp 0
 	progress := math.Mod(t/trLapPeriodS*float64(nSegs), float64(nSegs))
 	segIdx := int(progress)
 	local := progress - float64(segIdx)
-	a := trWaypoints[segIdx]
-	b := trWaypoints[(segIdx+1)%n]
+	a := wps[segIdx]
+	b := wps[(segIdx+1)%n]
 
 	runnerColor := visuals.Color{R: 255, G: 200, B: 50}
 	runner := &visuals.Sphere{
@@ -554,6 +580,7 @@ func (TrajectoryRunner) Tick(scene *visuals.Scene, t float64) []visuals.SceneEve
 // Uses a pointer receiver because the per-plot version counter
 // needs to mutate across tick calls.
 type LifecycleGarden struct {
+	YOrigin float64
 	version [lgNPlots]int
 }
 
@@ -614,7 +641,7 @@ func (lg *LifecycleGarden) Tick(scene *visuals.Scene, t float64) []visuals.Scene
 			lg.version[i]++
 			box := &visuals.Box{
 				Label:   fmt.Sprintf("garden_%d_v%d", i, lg.version[i]),
-				Pose:    visuals.Pose{X: x, Z: 100},
+				Pose:    visuals.Pose{X: x, Y: lg.YOrigin, Z: 100},
 				DimsMM:  visuals.BoxDims{X: 140, Y: 140, Z: 140},
 				Color:   &color,
 				Opacity: &opacity,
@@ -683,6 +710,52 @@ func (lg *LifecycleGarden) opacityFor(phase string) float64 {
 	return 0.0
 }
 
+// ---- all (every recipe, stacked along Y) ------------------------------
+
+// AllRecipe — run every other recipe simultaneously, stacked along Y.
+//
+// Driver-side equivalent of the standalone-playground's "all" preset.
+// Each sub-recipe gets a unique YOrigin so their visuals don't
+// collide. Label uniqueness is already enforced across recipes (each
+// uses its own prefix — march_*, pulse_*, demo_*, det_*, frame_* /
+// arm_*, wp_* / trajectory_*, garden_*), so simply running them in
+// sequence is collision-free.
+type AllRecipe struct {
+	subs []Recipe
+}
+
+func (*AllRecipe) Name() string { return "all" }
+
+func newAllRecipe() *AllRecipe {
+	return &AllRecipe{
+		subs: []Recipe{
+			MarchingBoxes{YOrigin: -2000},
+			PulsingSpheres{YOrigin: -1400},
+			AllPrimitives{YOrigin: -800},
+			DetectionsOverlay{YOrigin: 0},
+			&LifecycleGarden{YOrigin: 800},
+			TrajectoryRunner{YOrigin: 1500},
+			CoordinateFramesArm{YOrigin: 2400},
+		},
+	}
+}
+
+func (ar *AllRecipe) Initial(scene *visuals.Scene) []visuals.SceneEvent {
+	out := []visuals.SceneEvent{}
+	for _, sub := range ar.subs {
+		out = append(out, sub.Initial(scene)...)
+	}
+	return out
+}
+
+func (ar *AllRecipe) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+	out := []visuals.SceneEvent{}
+	for _, sub := range ar.subs {
+		out = append(out, sub.Tick(scene, t)...)
+	}
+	return out
+}
+
 // ---- registry ----------------------------------------------------------
 
 var Recipes = map[string]Recipe{
@@ -693,6 +766,7 @@ var Recipes = map[string]Recipe{
 	(CoordinateFramesArm{}).Name(): CoordinateFramesArm{},
 	(TrajectoryRunner{}).Name():    TrajectoryRunner{},
 	(&LifecycleGarden{}).Name():    &LifecycleGarden{},
+	(&AllRecipe{}).Name():          newAllRecipe(),
 }
 
 // ---- helpers -----------------------------------------------------------
