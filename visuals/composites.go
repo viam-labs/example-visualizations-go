@@ -24,15 +24,26 @@ type Composite interface {
 // Animations attach to the anchor; the axes inherit motion through
 // the parent-frame chain. The anchor's label is the user-supplied
 // Label; axes use Label + "_axis_x" / "_y" / "_z".
+// The three axes are Arrow primitives (cylindrical shaft + conical
+// tip) so direction is visually obvious from the tip. Each arrow's
+// tail sits at the frame origin, its tip pointing along the
+// corresponding axis. AxisLengthMM and AxisRadiusMM parameterize
+// the arrow size; per-axis colors can be customized independently.
+//
+// ShowAxesHelper defaults to true (nil pointer → on). The
+// renderer's built-in RGB axes helper renders alongside the
+// composite's explicit arrows — redundant when arrow colors match
+// the standard R/G/B but useful when you've tinted them.
 type CoordinateFrame struct {
 	Label          string
 	Pose           Pose
 	SizeMM         float64
 	ParentFrame    string
 	Animation      AnimationSpec
-	ShowAxesHelper bool
+	ShowAxesHelper *bool    // nil → true (use ptrB(false) to disable)
 	AnchorRadiusMM float64
 	AxisRadiusMM   float64
+	AxisLengthMM   float64  // 0 → use SizeMM
 	AnchorColor    *Color
 	AnchorOpacity  *float64
 	AxisColorX     *Color
@@ -47,18 +58,21 @@ func (cf CoordinateFrame) ToVisuals() []Visual {
 	if size <= 0 {
 		size = 100.0
 	}
-	half := size / 2.0
+	axisLen := cf.AxisLengthMM
+	if axisLen <= 0 {
+		axisLen = size
+	}
 	anchorR := cf.AnchorRadiusMM
 	if anchorR <= 0 {
 		anchorR = 12.0
 	}
 	axisR := cf.AxisRadiusMM
 	if axisR <= 0 {
-		axisR = 12.0
+		axisR = 8.0
 	}
 	anchorColor := cf.AnchorColor
 	if anchorColor == nil {
-		anchorColor = &Color{R: 255, G: 255, B: 255}
+		anchorColor = &Color{R: 120, G: 120, B: 120}
 	}
 	anchorOpacity := cf.AnchorOpacity
 	if anchorOpacity == nil {
@@ -80,33 +94,44 @@ func (cf CoordinateFrame) ToVisuals() []Visual {
 	if axisOpacity == nil {
 		axisOpacity = ptrF(1.0)
 	}
+	showAxes := true
+	if cf.ShowAxesHelper != nil {
+		showAxes = *cf.ShowAxesHelper
+	}
 
 	return []Visual{
 		Sphere{
 			Label: cf.Label, Pose: cf.Pose, ParentFrame: cf.ParentFrame,
 			RadiusMM: anchorR, Color: anchorColor, Opacity: anchorOpacity,
-			ShowAxesHelper: cf.ShowAxesHelper, Animation: cf.Animation,
+			ShowAxesHelper: showAxes, Animation: cf.Animation,
 		},
-		Capsule{
+		// Arrow tails sit at the frame origin; local +Z is the shaft
+		// direction. Each axis arrow orients its local +Z along the
+		// matching world axis.
+		Arrow{
 			Label: cf.Label + "_axis_x", ParentFrame: cf.Label,
-			Pose:     PoseAt(half, 0, 0, 1, 0, 0, 0),
-			RadiusMM: axisR, LengthMM: size,
+			Pose:     PoseAt(0, 0, 0, 1, 0, 0, 0),
+			RadiusMM: axisR, LengthMM: axisLen,
 			Color: xc, Opacity: axisOpacity,
 		},
-		Capsule{
+		Arrow{
 			Label: cf.Label + "_axis_y", ParentFrame: cf.Label,
-			Pose:     PoseAt(0, half, 0, 0, 1, 0, 0),
-			RadiusMM: axisR, LengthMM: size,
+			Pose:     PoseAt(0, 0, 0, 0, 1, 0, 0),
+			RadiusMM: axisR, LengthMM: axisLen,
 			Color: yc, Opacity: axisOpacity,
 		},
-		Capsule{
+		Arrow{
 			Label: cf.Label + "_axis_z", ParentFrame: cf.Label,
-			Pose:     PoseAt(0, 0, half, 0, 0, 1, 0),
-			RadiusMM: axisR, LengthMM: size,
+			// Default identity orientation (+Z up).
+			Pose:     PoseAt(0, 0, 0, 0, 0, 1, 0),
+			RadiusMM: axisR, LengthMM: axisLen,
 			Color: zc, Opacity: axisOpacity,
 		},
 	}
 }
+
+// ptrB is an internal helper to take a bool by pointer.
+func ptrB(v bool) *bool { return &v }
 
 // Line — polyline drawn as a chain of capsule segments. The wire
 // format has no first-class line primitive; this composite

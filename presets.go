@@ -242,7 +242,8 @@ func referenceFrameDemo() []Item {
 	frame := CoordinateFrame{
 		Label: "spinning_frame", Pose: identityPose(),
 		SizeMM: axisLength, AxisRadiusMM: axisRadius, AnchorRadiusMM: 12,
-		ShowAxesHelper: true, Animation: Spin{PeriodS: 6},
+		// ShowAxesHelper omitted — defaults to true on CoordinateFrame.
+		Animation: Spin{PeriodS: 6},
 	}
 	visuals := append([]Visual{}, frame.ToVisuals()...)
 	visuals = append(visuals, []Visual{
