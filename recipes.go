@@ -551,6 +551,16 @@ func (tr TrajectoryRunner) Tick(scene *visuals.Scene, t float64) []visuals.Scene
 	a := wps[segIdx]
 	b := wps[(segIdx+1)%n]
 
+	// Orientation: point along the current segment direction.
+	dx, dy, dz := b.X-a.X, b.Y-a.Y, b.Z-a.Z
+	segLen := math.Sqrt(dx*dx + dy*dy + dz*dz)
+	var ox, oy, oz float64
+	if segLen > 1e-6 {
+		ox, oy, oz = dx/segLen, dy/segLen, dz/segLen
+	} else {
+		oz = 1
+	}
+
 	runnerColor := visuals.Color{R: 255, G: 200, B: 50}
 	runner := &visuals.Sphere{
 		Label: "trajectory_runner",
@@ -558,7 +568,7 @@ func (tr TrajectoryRunner) Tick(scene *visuals.Scene, t float64) []visuals.Scene
 			X:  a.X + (b.X-a.X)*local,
 			Y:  a.Y + (b.Y-a.Y)*local,
 			Z:  a.Z + (b.Z-a.Z)*local,
-			OZ: 1,
+			OX: ox, OY: oy, OZ: oz,
 		},
 		RadiusMM:       55,
 		Color:          &runnerColor,
@@ -710,6 +720,162 @@ func (lg *LifecycleGarden) opacityFor(phase string) float64 {
 	return 0.0
 }
 
+// ---- force_vector -----------------------------------------------------
+
+// ForceVector — animated force-vector arrow: length, radius, and
+// orientation all cycling simultaneously.
+//
+// Mirrors the standalone-playground's force_vector_demo preset.
+// The arrow's length and radius oscillate on phase-offset sine
+// waves; orientation precesses around world +Z at a fixed tilt.
+// Color cycling (the standalone preset's hue sweep) is not included
+// because metadata updates don't propagate via UPDATED — only at
+// spawn time. To add color cycling, use the label-rotation pattern
+// from BreathingShapes.
+// (Named ForceVectorRecipe — the unqualified “ForceVector“ is
+// already taken by the visuals AnimationSpec alias in aliases.go.)
+type ForceVectorRecipe struct {
+	YOrigin float64
+}
+
+func (ForceVectorRecipe) Name() string { return "force_vector" }
+
+const (
+	fvBaseLength      = 200.0
+	fvLengthAmplitude = 80.0
+	fvLengthPeriodS   = 3.2
+	fvBaseRadius      = 16.0
+	fvRadiusAmplitude = 6.0
+	fvRadiusPeriodS   = 2.0
+	fvTiltDeg         = 45.0
+	fvPrecessionPerS  = 5.0
+)
+
+func (fv ForceVectorRecipe) Initial(scene *visuals.Scene) []visuals.SceneEvent {
+	color := visuals.Color{R: 255, G: 140, B: 30}
+	arrow := &visuals.Arrow{
+		Label:    "force_vector",
+		Pose:     visuals.Pose{Y: fv.YOrigin, OZ: 1},
+		LengthMM: fvBaseLength,
+		RadiusMM: fvBaseRadius,
+		Color:    &color,
+	}
+	events, _ := scene.Add(arrow)
+	return events
+}
+
+func (fv ForceVectorRecipe) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+	length := fvBaseLength + fvLengthAmplitude*math.Sin(2*math.Pi*t/fvLengthPeriodS)
+	radius := fvBaseRadius + fvRadiusAmplitude*math.Sin(2*math.Pi*t/fvRadiusPeriodS+math.Pi/2)
+
+	tiltRad := fvTiltDeg * math.Pi / 180.0
+	phi := 2 * math.Pi * t / fvPrecessionPerS
+	ox := math.Sin(tiltRad) * math.Cos(phi)
+	oy := math.Sin(tiltRad) * math.Sin(phi)
+	oz := math.Cos(tiltRad)
+
+	color := visuals.Color{R: 255, G: 140, B: 30}
+	arrow := &visuals.Arrow{
+		Label:    "force_vector",
+		Pose:     visuals.Pose{Y: fv.YOrigin, OX: ox, OY: oy, OZ: oz},
+		LengthMM: length,
+		RadiusMM: radius,
+		Color:    &color,
+	}
+	events, _ := scene.AddOrUpdate(arrow)
+	return events
+}
+
+// ---- breathing_shapes -------------------------------------------------
+
+// BreathingShapes — N spheres whose opacity smoothly cycles in
+// [0, 1] via label rotation. Demonstrates the only working pattern
+// for live opacity changes given the renderer's UPDATED handler
+// ignores metadata.* paths: REMOVE the current label, ADD with a
+// fresh label so the renderer re-reads metadata at spawn.
+//
+// Opacity is snapped to STEPS_PER_PERIOD discrete values per
+// oscillation period so label-rotation rate stays bounded.
+//
+// Pointer receiver because the per-slot version + last-step
+// counters mutate across tick calls.
+type BreathingShapes struct {
+	YOrigin      float64
+	version      [bsN]int
+	lastStep     [bsN]int
+	initLastStep bool
+}
+
+func (*BreathingShapes) Name() string { return "breathing_shapes" }
+
+const (
+	bsN              = 4
+	bsSpacingMM      = 300.0
+	bsRadiusMM       = 70.0
+	bsPeriodS        = 3.5
+	bsStepsPerPeriod = 16
+	bsOpacityMin     = 0.10
+	bsOpacityMax     = 1.0
+)
+
+func (bs *BreathingShapes) Initial(scene *visuals.Scene) []visuals.SceneEvent {
+	if !bs.initLastStep {
+		for i := range bs.lastStep {
+			bs.lastStep[i] = -1
+		}
+		bs.initLastStep = true
+	}
+	return nil
+}
+
+func (bs *BreathingShapes) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+	if !bs.initLastStep {
+		for i := range bs.lastStep {
+			bs.lastStep[i] = -1
+		}
+		bs.initLastStep = true
+	}
+	out := []visuals.SceneEvent{}
+	for i := 0; i < bsN; i++ {
+		phase := 2 * math.Pi * float64(i) / float64(bsN)
+		theta := 2*math.Pi*t/bsPeriodS + phase
+		opacity := bsOpacityMin + (bsOpacityMax-bsOpacityMin)*0.5*(1+math.Sin(theta))
+		step := int(theta/(2*math.Pi/float64(bsStepsPerPeriod))) % bsStepsPerPeriod
+		if step == bs.lastStep[i] {
+			continue
+		}
+		bs.lastStep[i] = step
+		bs.version[i]++
+
+		prefix := fmt.Sprintf("breathe_%d_v", i)
+		var current string
+		for _, lab := range scene.Labels() {
+			if strings.HasPrefix(lab, prefix) {
+				current = lab
+				break
+			}
+		}
+		if current != "" {
+			out = append(out, scene.Remove(current)...)
+		}
+
+		x := (float64(i) - float64(bsN-1)/2.0) * bsSpacingMM
+		c := rainbow(float64(i) / float64(bsN))
+		op := opacity
+		sphere := &visuals.Sphere{
+			Label:    fmt.Sprintf("breathe_%d_v%d", i, bs.version[i]),
+			Pose:     visuals.Pose{X: x, Y: bs.YOrigin, Z: 120},
+			RadiusMM: bsRadiusMM,
+			Color:    &c,
+			Opacity:  &op,
+		}
+		if events, err := scene.Add(sphere); err == nil {
+			out = append(out, events...)
+		}
+	}
+	return out
+}
+
 // ---- all (every recipe, stacked along Y) ------------------------------
 
 // AllRecipe — run every other recipe simultaneously, stacked along Y.
@@ -729,13 +895,15 @@ func (*AllRecipe) Name() string { return "all" }
 func newAllRecipe() *AllRecipe {
 	return &AllRecipe{
 		subs: []Recipe{
-			MarchingBoxes{YOrigin: -2000},
-			PulsingSpheres{YOrigin: -1400},
+			MarchingBoxes{YOrigin: -2600},
+			PulsingSpheres{YOrigin: -2000},
+			&BreathingShapes{YOrigin: -1400},
 			AllPrimitives{YOrigin: -800},
 			DetectionsOverlay{YOrigin: 0},
-			&LifecycleGarden{YOrigin: 800},
-			TrajectoryRunner{YOrigin: 1500},
-			CoordinateFramesArm{YOrigin: 2400},
+			ForceVectorRecipe{YOrigin: 600},
+			&LifecycleGarden{YOrigin: 1200},
+			TrajectoryRunner{YOrigin: 1900},
+			CoordinateFramesArm{YOrigin: 2800},
 		},
 	}
 }
@@ -766,6 +934,8 @@ var Recipes = map[string]Recipe{
 	(CoordinateFramesArm{}).Name(): CoordinateFramesArm{},
 	(TrajectoryRunner{}).Name():    TrajectoryRunner{},
 	(&LifecycleGarden{}).Name():    &LifecycleGarden{},
+	(ForceVectorRecipe{}).Name():   ForceVectorRecipe{},
+	(&BreathingShapes{}).Name():    &BreathingShapes{},
 	(&AllRecipe{}).Name():          newAllRecipe(),
 }
 

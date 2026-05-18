@@ -309,9 +309,12 @@ func flattenLabels(in []interface{}) []string {
 func diffPaths(old, new Item) []string {
 	var paths []string
 
-	// Pose: per-subfield diff. The renderer's check is
-	// path.startsWith("poseInObserverFrame.pose") and re-reads the
-	// full pose; emitting per-axis paths is informational.
+	// Pose: per-subfield diff. All seven keys share the renderer's
+	// ``poseInObserverFrame.pose`` prefix which triggers a full Pose
+	// re-read; emitting per-subfield paths is informational.
+	// Including ox/oy/oz means orientation-only mutations
+	// (precession, "face the next waypoint") still emit at least
+	// one path and propagate to the renderer.
 	if old.Pose.X != new.Pose.X {
 		paths = append(paths, "poseInObserverFrame.pose.x")
 	}
@@ -320,6 +323,15 @@ func diffPaths(old, new Item) []string {
 	}
 	if old.Pose.Z != new.Pose.Z {
 		paths = append(paths, "poseInObserverFrame.pose.z")
+	}
+	if old.Pose.OX != new.Pose.OX {
+		paths = append(paths, "poseInObserverFrame.pose.oX")
+	}
+	if old.Pose.OY != new.Pose.OY {
+		paths = append(paths, "poseInObserverFrame.pose.oY")
+	}
+	if old.Pose.OZ != new.Pose.OZ {
+		paths = append(paths, "poseInObserverFrame.pose.oZ")
 	}
 	if old.Pose.Theta != new.Pose.Theta {
 		paths = append(paths, "poseInObserverFrame.pose.theta")
@@ -361,4 +373,3 @@ func diffPaths(old, new Item) []string {
 
 	return paths
 }
-

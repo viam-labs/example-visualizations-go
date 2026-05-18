@@ -11,11 +11,12 @@ import (
 
 // ---- registry ---------------------------------------------------------
 
-func TestRecipes_ContainsAllEight(t *testing.T) {
+func TestRecipes_ContainsAllTen(t *testing.T) {
 	want := []string{
-		"all", "all_primitives", "coordinate_frames_arm",
-		"detections_overlay", "lifecycle_garden", "marching_boxes",
-		"pulsing_spheres", "trajectory_runner",
+		"all", "all_primitives", "breathing_shapes",
+		"coordinate_frames_arm", "detections_overlay", "force_vector",
+		"lifecycle_garden", "marching_boxes", "pulsing_spheres",
+		"trajectory_runner",
 	}
 	got := make([]string, 0, len(Recipes))
 	for k := range Recipes {
@@ -404,6 +405,140 @@ func TestLifecycleGarden_ColorChangesThroughPhases(t *testing.T) {
 	}
 	if aliveColor == nil || *aliveColor != lgColorAlive {
 		t.Errorf("expected alive color %v, got %v", lgColorAlive, aliveColor)
+	}
+}
+
+// ---- trajectory_runner orientation -----------------------------------
+
+func TestTrajectoryRunner_TickEmitsOrientationPaths(t *testing.T) {
+	scene := visuals.NewScene("world")
+	TrajectoryRunner{}.Initial(scene)
+	events := TrajectoryRunner{}.Tick(scene, 0.5)
+	hasOrientPath := false
+	for _, p := range events[0].Paths {
+		if strings.HasPrefix(p, "poseInObserverFrame.pose.o") {
+			hasOrientPath = true
+			break
+		}
+	}
+	if !hasOrientPath {
+		t.Errorf("expected orientation path in tick output: %v", events[0].Paths)
+	}
+}
+
+func TestTrajectoryRunner_OrientationPointsAlongSegment(t *testing.T) {
+	scene := visuals.NewScene("world")
+	tr := TrajectoryRunner{}
+	tr.Initial(scene)
+	tr.Tick(scene, 0.5)
+	v := scene.Get("trajectory_runner")
+	runner, ok := v.(*visuals.Sphere)
+	if !ok {
+		t.Fatalf("runner is %T", v)
+	}
+	wps := tr.waypoints()
+	dx, dy, dz := wps[1].X-wps[0].X, wps[1].Y-wps[0].Y, wps[1].Z-wps[0].Z
+	segLen := math.Sqrt(dx*dx + dy*dy + dz*dz)
+	if math.Abs(runner.Pose.OX-dx/segLen) > 1e-6 ||
+		math.Abs(runner.Pose.OY-dy/segLen) > 1e-6 ||
+		math.Abs(runner.Pose.OZ-dz/segLen) > 1e-6 {
+		t.Errorf("orientation mismatch: got (%v,%v,%v) want (%v,%v,%v)",
+			runner.Pose.OX, runner.Pose.OY, runner.Pose.OZ,
+			dx/segLen, dy/segLen, dz/segLen)
+	}
+}
+
+// ---- force_vector recipe ---------------------------------------------
+
+func TestForceVector_InitialInstallsArrow(t *testing.T) {
+	scene := visuals.NewScene("world")
+	events := ForceVectorRecipe{}.Initial(scene)
+	if len(events) != 1 || events[0].Item.Type != "arrow" {
+		t.Errorf("expected 1 arrow ADDED, got %+v", events)
+	}
+}
+
+func TestForceVector_TickEmitsLengthRadiusOrientationPaths(t *testing.T) {
+	scene := visuals.NewScene("world")
+	ForceVectorRecipe{}.Initial(scene)
+	events := ForceVectorRecipe{}.Tick(scene, 1.0)
+	paths := strings.Join(events[0].Paths, " ")
+	if !strings.Contains(paths, "lengthMm") {
+		t.Errorf("missing length path: %v", events[0].Paths)
+	}
+	if !strings.Contains(paths, "radiusMm") {
+		t.Errorf("missing radius path: %v", events[0].Paths)
+	}
+	if !strings.Contains(paths, "poseInObserverFrame.pose.o") {
+		t.Errorf("missing orientation path: %v", events[0].Paths)
+	}
+}
+
+// ---- breathing_shapes ------------------------------------------------
+
+func TestBreathingShapes_InitialIsEmpty(t *testing.T) {
+	scene := visuals.NewScene("world")
+	bs := &BreathingShapes{}
+	if got := bs.Initial(scene); len(got) != 0 {
+		t.Errorf("expected empty initial, got %d events", len(got))
+	}
+}
+
+func TestBreathingShapes_FirstTickAddsShapes(t *testing.T) {
+	scene := visuals.NewScene("world")
+	bs := &BreathingShapes{}
+	events := bs.Tick(scene, 0.0)
+	added := 0
+	for _, e := range events {
+		if e.Kind == visuals.EventAdded {
+			added++
+		}
+	}
+	if added != bsN {
+		t.Errorf("expected %d ADDs on first tick, got %d", bsN, added)
+	}
+}
+
+func TestBreathingShapes_StepChangeRotatesLabels(t *testing.T) {
+	scene := visuals.NewScene("world")
+	bs := &BreathingShapes{}
+	bs.Tick(scene, 0.0)
+	stepDt := bsPeriodS / float64(bsStepsPerPeriod)
+	events := bs.Tick(scene, stepDt*1.01)
+	added := 0
+	removed := 0
+	for _, e := range events {
+		switch e.Kind {
+		case visuals.EventAdded:
+			added++
+		case visuals.EventRemoved:
+			removed++
+		}
+	}
+	if added == 0 || added != removed {
+		t.Errorf("expected matched ADD/REMOVE pairs, got %d ADD %d REMOVE",
+			added, removed)
+	}
+}
+
+// ---- all recipe includes new recipes ---------------------------------
+
+func TestAllRecipe_IncludesForceVectorAndBreathing(t *testing.T) {
+	ar := newAllRecipe()
+	hasFV, hasBS := false, false
+	for _, sub := range ar.subs {
+		switch sub.(type) {
+		case ForceVectorRecipe:
+			hasFV = true
+		case *BreathingShapes:
+			hasBS = true
+		}
+	}
+	if !hasFV {
+		t.Error("AllRecipe missing ForceVectorRecipe")
+	}
+	if !hasBS {
+		t.Error("AllRecipe missing BreathingShapes")
 	}
 }
 
