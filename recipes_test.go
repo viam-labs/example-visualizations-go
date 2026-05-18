@@ -12,9 +12,9 @@ import (
 
 // ---- registry ---------------------------------------------------------
 
-func TestRecipes_ContainsAllTen(t *testing.T) {
+func TestRecipes_ContainsAllRecipes(t *testing.T) {
 	want := []string{
-		"all", "all_primitives", "breathing_shapes",
+		"all", "all_primitives", "breathing_shapes", "color_cycling",
 		"coordinate_frames_arm", "detections_overlay", "force_vector",
 		"lifecycle_garden", "marching_boxes", "pulsing_spheres",
 		"trajectory_runner",
@@ -577,17 +577,65 @@ func TestBreathingShapes_StepChangeRotatesLabels(t *testing.T) {
 	}
 }
 
+// ---- color_cycling ----------------------------------------------------
+
+func TestColorCycling_InitialIsEmpty(t *testing.T) {
+	scene := visuals.NewScene("world")
+	cc := &ColorCycling{}
+	if got := cc.Initial(scene); len(got) != 0 {
+		t.Errorf("expected empty initial, got %d events", len(got))
+	}
+}
+
+func TestColorCycling_FirstTickAddsShapes(t *testing.T) {
+	scene := visuals.NewScene("world")
+	cc := &ColorCycling{}
+	events := cc.Tick(scene, 0.0)
+	added := 0
+	for _, e := range events {
+		if e.Kind == visuals.EventAdded {
+			added++
+		}
+	}
+	if added != ccN {
+		t.Errorf("expected %d ADDs on first tick, got %d", ccN, added)
+	}
+}
+
+func TestColorCycling_StepChangeRotatesLabels(t *testing.T) {
+	scene := visuals.NewScene("world")
+	cc := &ColorCycling{}
+	cc.Tick(scene, 0.0)
+	stepDt := ccPeriodS / float64(ccStepsPerPeriod)
+	events := cc.Tick(scene, stepDt*1.01)
+	added, removed := 0, 0
+	for _, e := range events {
+		switch e.Kind {
+		case visuals.EventAdded:
+			added++
+		case visuals.EventRemoved:
+			removed++
+		}
+	}
+	if added == 0 || added != removed {
+		t.Errorf("expected matched ADD/REMOVE pairs, got %d ADD %d REMOVE",
+			added, removed)
+	}
+}
+
 // ---- all recipe includes new recipes ---------------------------------
 
 func TestAllRecipe_IncludesForceVectorAndBreathing(t *testing.T) {
 	ar := newAllRecipe()
-	hasFV, hasBS := false, false
+	hasFV, hasBS, hasCC := false, false, false
 	for _, sub := range ar.subs {
 		switch sub.(type) {
 		case ForceVectorRecipe:
 			hasFV = true
 		case *BreathingShapes:
 			hasBS = true
+		case *ColorCycling:
+			hasCC = true
 		}
 	}
 	if !hasFV {
@@ -595,6 +643,9 @@ func TestAllRecipe_IncludesForceVectorAndBreathing(t *testing.T) {
 	}
 	if !hasBS {
 		t.Error("AllRecipe missing BreathingShapes")
+	}
+	if !hasCC {
+		t.Error("AllRecipe missing ColorCycling")
 	}
 }
 

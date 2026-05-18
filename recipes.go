@@ -884,6 +884,94 @@ func (bs *BreathingShapes) Tick(scene *visuals.Scene, t float64) []visuals.Scene
 	return out
 }
 
+// ---- color_cycling ----------------------------------------------------
+
+// ColorCycling — N spheres whose color smoothly cycles through the
+// rainbow via label rotation.
+//
+// Sibling to BreathingShapes: same REMOVE+re-ADD pattern (the
+// renderer ignores metadata.color UPDATED paths just like
+// metadata.opacities), but cycles hue instead of opacity. Together
+// they cover the two metadata-only animation knobs.
+//
+// Hue snaps to ccStepsPerPeriod discrete values per cycle so the
+// label-rotation rate stays bounded. The phase offset across slots
+// reads as a smooth rainbow wave moving across the row.
+//
+// Pointer receiver because the per-slot version + last-step
+// counters mutate across tick calls.
+type ColorCycling struct {
+	YOrigin      float64
+	version      [ccN]int
+	lastStep     [ccN]int
+	initLastStep bool
+}
+
+func (*ColorCycling) Name() string { return "color_cycling" }
+
+const (
+	ccN              = 4
+	ccSpacingMM      = 300.0
+	ccRadiusMM       = 80.0
+	ccPeriodS        = 5.0
+	ccStepsPerPeriod = 24
+)
+
+func (cc *ColorCycling) Initial(scene *visuals.Scene) []visuals.SceneEvent {
+	if !cc.initLastStep {
+		for i := range cc.lastStep {
+			cc.lastStep[i] = -1
+		}
+		cc.initLastStep = true
+	}
+	return nil
+}
+
+func (cc *ColorCycling) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+	if !cc.initLastStep {
+		for i := range cc.lastStep {
+			cc.lastStep[i] = -1
+		}
+		cc.initLastStep = true
+	}
+	out := []visuals.SceneEvent{}
+	for i := 0; i < ccN; i++ {
+		phase := float64(i) / float64(ccN)
+		hue := math.Mod(t/ccPeriodS+phase, 1.0)
+		step := int(hue*float64(ccStepsPerPeriod)) % ccStepsPerPeriod
+		if step == cc.lastStep[i] {
+			continue
+		}
+		cc.lastStep[i] = step
+		cc.version[i]++
+
+		prefix := fmt.Sprintf("colorcycle_%d_v", i)
+		var current string
+		for _, lab := range scene.Labels() {
+			if strings.HasPrefix(lab, prefix) {
+				current = lab
+				break
+			}
+		}
+		if current != "" {
+			out = append(out, scene.Remove(current)...)
+		}
+
+		x := (float64(i) - float64(ccN-1)/2.0) * ccSpacingMM
+		c := rainbow(float64(step) / float64(ccStepsPerPeriod))
+		sphere := &visuals.Sphere{
+			Label:    fmt.Sprintf("colorcycle_%d_v%d", i, cc.version[i]),
+			Pose:     visuals.Pose{X: x, Y: cc.YOrigin, Z: 120},
+			RadiusMM: ccRadiusMM,
+			Color:    &c,
+		}
+		if events, err := scene.Add(sphere); err == nil {
+			out = append(out, events...)
+		}
+	}
+	return out
+}
+
 // ---- all (every recipe, stacked along Y) ------------------------------
 
 // AllRecipe — run every other recipe simultaneously, stacked along Y.
@@ -903,9 +991,10 @@ func (*AllRecipe) Name() string { return "all" }
 func newAllRecipe() *AllRecipe {
 	return &AllRecipe{
 		subs: []Recipe{
-			MarchingBoxes{YOrigin: -2600},
-			PulsingSpheres{YOrigin: -2000},
-			&BreathingShapes{YOrigin: -1400},
+			MarchingBoxes{YOrigin: -3200},
+			PulsingSpheres{YOrigin: -2600},
+			&BreathingShapes{YOrigin: -2000},
+			&ColorCycling{YOrigin: -1400},
 			AllPrimitives{YOrigin: -800},
 			DetectionsOverlay{YOrigin: 0},
 			ForceVectorRecipe{YOrigin: 600},
@@ -944,6 +1033,7 @@ var Recipes = map[string]Recipe{
 	(&LifecycleGarden{}).Name():    &LifecycleGarden{},
 	(ForceVectorRecipe{}).Name():   ForceVectorRecipe{},
 	(&BreathingShapes{}).Name():    &BreathingShapes{},
+	(&ColorCycling{}).Name():       &ColorCycling{},
 	(&AllRecipe{}).Name():          newAllRecipe(),
 }
 
