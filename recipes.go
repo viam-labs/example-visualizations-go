@@ -554,12 +554,20 @@ func (tr TrajectoryRunner) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 func (tr TrajectoryRunner) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
 	wps := tr.waypoints()
 	n := len(wps)
-	nSegs := n // LOOP=true: wrap back to wp 0
+	// nSegs = n-1 so the runner walks wp0→wp1→…→wp[n-1] and then
+	// snaps back to wp0 to start the next lap. Matches the
+	// all-in-one playground's trajectory_preview; avoids a phantom
+	// interpolated wp[-1]→wp[0] segment that visually overshoots the
+	// last waypoint and makes the runner stop matching its frame.
+	nSegs := n - 1
 	progress := math.Mod(t/trLapPeriodS*float64(nSegs), float64(nSegs))
 	segIdx := int(progress)
+	if segIdx >= nSegs {
+		segIdx = nSegs - 1
+	}
 	local := progress - float64(segIdx)
 	a := wps[segIdx]
-	b := wps[(segIdx+1)%n]
+	b := wps[segIdx+1]
 
 	// Lerp position + orientation between adjacent waypoints.
 	// LerpPose handles the lerp-and-normalize on the orientation

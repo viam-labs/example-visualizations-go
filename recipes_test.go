@@ -435,6 +435,53 @@ func TestTrajectoryRunner_TickEmitsOrientationPaths(t *testing.T) {
 	}
 }
 
+// Regression: at t just under the lap period, the runner should be
+// at (or arbitrarily close to) the last waypoint — NOT interpolating
+// back toward wp0. A phantom wp[-1]→wp[0] wrap segment used to put
+// the runner mid-air while the displayed plan line and final frame
+// were already at the last waypoint.
+func TestTrajectoryRunner_EndOfLapMatchesLastWaypoint(t *testing.T) {
+	scene := visuals.NewScene("world")
+	tr := TrajectoryRunner{}
+	tr.Initial(scene)
+	tr.Tick(scene, 12.0-0.001) // 1ms before lap end
+	v := scene.Get("trajectory_runner")
+	runner, ok := v.(*visuals.Sphere)
+	if !ok {
+		t.Fatalf("runner is %T", v)
+	}
+	last := tr.waypoints()[len(tr.waypoints())-1]
+	if math.Abs(runner.Pose.X-last.X) > 5.0 ||
+		math.Abs(runner.Pose.Y-last.Y) > 5.0 ||
+		math.Abs(runner.Pose.Z-last.Z) > 5.0 {
+		t.Errorf("runner @ t≈lap should be near last wp (%v,%v,%v), got (%v,%v,%v)",
+			last.X, last.Y, last.Z,
+			runner.Pose.X, runner.Pose.Y, runner.Pose.Z)
+	}
+}
+
+// Regression: at t = lap_period exactly, the modulo wraps progress
+// to 0 — the runner snaps back to wp0 to start a new lap.
+func TestTrajectoryRunner_AtLapBoundarySnapsToWP0(t *testing.T) {
+	scene := visuals.NewScene("world")
+	tr := TrajectoryRunner{}
+	tr.Initial(scene)
+	tr.Tick(scene, 12.0)
+	v := scene.Get("trajectory_runner")
+	runner, ok := v.(*visuals.Sphere)
+	if !ok {
+		t.Fatalf("runner is %T", v)
+	}
+	wp0 := tr.waypoints()[0]
+	if math.Abs(runner.Pose.X-wp0.X) > 1e-6 ||
+		math.Abs(runner.Pose.Y-wp0.Y) > 1e-6 ||
+		math.Abs(runner.Pose.Z-wp0.Z) > 1e-6 {
+		t.Errorf("runner @ t=lap should snap to wp0 (%v,%v,%v), got (%v,%v,%v)",
+			wp0.X, wp0.Y, wp0.Z,
+			runner.Pose.X, runner.Pose.Y, runner.Pose.Z)
+	}
+}
+
 func TestTrajectoryRunner_OrientationLerpsFromWaypoints(t *testing.T) {
 	scene := visuals.NewScene("world")
 	tr := TrajectoryRunner{}
