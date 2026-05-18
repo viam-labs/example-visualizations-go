@@ -115,7 +115,12 @@ func TestScene_Update_PoseEmitsPerAxisPaths(t *testing.T) {
 	}
 }
 
-func TestScene_Update_ColorAndOpacity(t *testing.T) {
+func TestScene_Update_MetadataOnlyChangeYieldsNoEvent(t *testing.T) {
+	// Color / opacity changes don't propagate to the renderer via
+	// UPDATED events (the renderer's updateEntity matcher ignores
+	// metadata.* prefixes). Scene.Update reflects that by emitting
+	// no event when only metadata fields changed — sending a
+	// useless wire event would be misleading.
 	s := NewScene("world")
 	b := &Box{
 		Label:   "b",
@@ -132,9 +137,8 @@ func TestScene_Update_ColorAndOpacity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	paths := setOf(events[0].Paths)
-	if !paths["metadata.colors"] || !paths["metadata.opacities"] {
-		t.Errorf("expected colors+opacities paths, got %v", events[0].Paths)
+	if len(events) != 0 {
+		t.Errorf("metadata-only change should produce no event, got %v", events)
 	}
 }
 

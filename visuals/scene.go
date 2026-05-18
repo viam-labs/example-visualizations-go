@@ -286,14 +286,32 @@ func flattenLabels(in []interface{}) []string {
 }
 
 // diffPaths returns the field-mask path list describing what
-// changed between two wire-format items. Paths follow the same
-// camelCase convention the RDK fake emits — see
-// services/worldstatestore/fake/moving_geos_world.go for the
-// canonical reference.
+// changed between two wire-format items.
+//
+// Only emits paths the renderer honors on UPDATED events. The
+// motion-tools renderer at
+// useWorldState.svelte.ts::updateEntity matches just two prefixes:
+//
+//   - "poseInObserverFrame.pose*" — re-reads the pose, updates the
+//     entity's Pose trait.
+//   - "physicalObject*" — re-reads geometryType.value and dispatches
+//     to traits.Box / Capsule / Sphere / mesh-BufferGeometry. There
+//     is no pointcloud case; pcd updates would no-op.
+//
+// All "metadata.*" paths (color, colors, opacity, opacities,
+// show_axes_helper, invisible) are dropped silently. Metadata
+// changes only propagate at spawn time; to refresh metadata on the
+// renderer, REMOVE + ADD the entity with a fresh UUID (lifecycle-
+// style label rotation, or the versioned UUID strategy on the
+// visualizer).
+//
+// See LESSONS.md::renderer-honors-only-pose-and-physicalobject-on-updated.
 func diffPaths(old, new Item) []string {
 	var paths []string
 
-	// Pose: per-subfield diff.
+	// Pose: per-subfield diff. The renderer's check is
+	// path.startsWith("poseInObserverFrame.pose") and re-reads the
+	// full pose; emitting per-axis paths is informational.
 	if old.Pose.X != new.Pose.X {
 		paths = append(paths, "poseInObserverFrame.pose.x")
 	}
@@ -307,19 +325,7 @@ func diffPaths(old, new Item) []string {
 		paths = append(paths, "poseInObserverFrame.pose.theta")
 	}
 
-	// Top-level scalars.
-	if !colorEq(old.Color, new.Color) {
-		paths = append(paths, "metadata.colors")
-	}
-	if !float64PtrEq(old.Opacity, new.Opacity) {
-		paths = append(paths, "metadata.opacities")
-	}
-	if old.ShowAxesHelper != new.ShowAxesHelper {
-		paths = append(paths, "metadata.show_axes_helper")
-	}
-	if old.Invisible != new.Invisible {
-		paths = append(paths, "metadata.invisible")
-	}
+	// Geometry scalars the renderer rebuilds via physicalObject.*.
 	if old.RadiusMM != new.RadiusMM {
 		paths = append(paths, "physicalObject.geometryType.value.radiusMm")
 	}
@@ -327,7 +333,8 @@ func diffPaths(old, new Item) []string {
 		paths = append(paths, "physicalObject.geometryType.value.lengthMm")
 	}
 
-	// Box dims_mm: per-axis diff.
+	// Box dims_mm: per-axis diff. The renderer reads the full Box
+	// geometry on any physicalObject* path.
 	if old.HasDims || new.HasDims {
 		if old.DimsMM.X != new.DimsMM.X {
 			paths = append(paths, "physicalObject.geometryType.value.dimsMm.x")
@@ -340,33 +347,18 @@ func diffPaths(old, new Item) []string {
 		}
 	}
 
-	// Mesh / pointcloud path swaps trigger a whole-geom replacement.
+	// Mesh path swap: renderer re-parses the PLY and sets
+	// traits.BufferGeometry.
 	if old.MeshPath != new.MeshPath {
 		paths = append(paths, "physicalObject.mesh")
 	}
-	if old.PointcloudPath != new.PointcloudPath {
-		paths = append(paths, "physicalObject.pointcloud")
-	}
+
+	// NOTE: pointcloud_path changes do not get an UPDATED path —
+	// the renderer's updateEntity has no "pointcloud" case. Re-
+	// spawn the entity (REMOVE + ADD with a fresh label) to update
+	// a pcd. Color/opacity/show_axes_helper/invisible changes
+	// likewise omitted — see file header.
 
 	return paths
 }
 
-func colorEq(a, b *Color) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	return *a == *b
-}
-
-func float64PtrEq(a, b *float64) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	return *a == *b
-}
