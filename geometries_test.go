@@ -14,7 +14,7 @@ import (
 
 func TestMetadataEmitsAllFiveRequiredKeys(t *testing.T) {
 	m := visuals.BuildMetadata(visuals.MetadataOpts{
-		Color:   &Color{R: 255, G: 0, B: 0},
+		Color:   &visuals.Color{R: 255, G: 0, B: 0},
 		Opacity: ptrF(0.5),
 	})
 	if m == nil {
@@ -28,7 +28,7 @@ func TestMetadataEmitsAllFiveRequiredKeys(t *testing.T) {
 }
 
 func TestMetadataColorsIsBase64OfPackedRGB(t *testing.T) {
-	m := visuals.BuildMetadata(visuals.MetadataOpts{Color: &Color{R: 10, G: 20, B: 30}})
+	m := visuals.BuildMetadata(visuals.MetadataOpts{Color: &visuals.Color{R: 10, G: 20, B: 30}})
 	colors := m.Fields["colors"].GetStringValue()
 	want := base64.StdEncoding.EncodeToString([]byte{10, 20, 30})
 	if colors != want {
@@ -47,12 +47,12 @@ func TestMetadataOpacitiesIsBase64AlphaByte(t *testing.T) {
 }
 
 func TestMetadataChunksOptional(t *testing.T) {
-	m := visuals.BuildMetadata(visuals.MetadataOpts{Color: &Color{R: 0, G: 0, B: 0}, Opacity: ptrF(1.0)})
+	m := visuals.BuildMetadata(visuals.MetadataOpts{Color: &visuals.Color{R: 0, G: 0, B: 0}, Opacity: ptrF(1.0)})
 	if _, ok := m.Fields["chunks"]; ok {
 		t.Error("chunks should not be present when not set")
 	}
 	m = visuals.BuildMetadata(visuals.MetadataOpts{
-		Color:  &Color{R: 0, G: 0, B: 0},
+		Color:  &visuals.Color{R: 0, G: 0, B: 0},
 		Chunks: map[string]any{"chunk_size": 100.0, "total": 5.0},
 	})
 	if _, ok := m.Fields["chunks"]; !ok {

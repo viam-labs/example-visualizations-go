@@ -90,7 +90,7 @@ func (s *sceneSprites) Reconfigure(
 		parentFrame = DefaultParentFrame
 	}
 
-	var items []Item
+	var items []visuals.Item
 	if len(cfg.Items) > 0 {
 		for _, ic := range cfg.Items {
 			items = append(items, ic.toItem())
@@ -134,7 +134,7 @@ func (s *sceneSprites) DoCommand(ctx context.Context, command map[string]any) (m
 
 // ---- SceneHooks implementation ---------------------------------------
 
-func (s *sceneSprites) BuildGeometry(item Item, override visuals.BaseGeom) (*commonpb.Geometry, error) {
+func (s *sceneSprites) BuildGeometry(item visuals.Item, override visuals.BaseGeom) (*commonpb.Geometry, error) {
 	switch item.Type {
 	case "box":
 		dims := item.DimsMM
@@ -202,15 +202,15 @@ func (s *sceneSprites) ReadAsset(path string) ([]byte, error) {
 	return os.ReadFile(p)
 }
 
-func (s *sceneSprites) ComputeTick(item Item, basePose Pose, baseGeom visuals.BaseGeom, t float64) visuals.TickResult {
+func (s *sceneSprites) ComputeTick(item visuals.Item, basePose visuals.Pose, baseGeom visuals.BaseGeom, t float64) visuals.TickResult {
 	return ComputeTick(item.Type, item.Animation, basePose, baseGeom, t)
 }
 
-func (s *sceneSprites) IsAnimated(item Item) bool {
+func (s *sceneSprites) IsAnimated(item visuals.Item) bool {
 	return visuals.IsAnimated(item.Animation)
 }
 
-func (s *sceneSprites) LoadPreset(name string) ([]Item, error) {
+func (s *sceneSprites) LoadPreset(name string) ([]visuals.Item, error) {
 	fn, ok := Presets[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown preset %q", name)
@@ -218,7 +218,7 @@ func (s *sceneSprites) LoadPreset(name string) ([]Item, error) {
 	return fn(), nil
 }
 
-func (s *sceneSprites) BaseGeomForItem(item Item) visuals.BaseGeom {
+func (s *sceneSprites) BaseGeomForItem(item visuals.Item) visuals.BaseGeom {
 	bg := visuals.BaseGeom{}
 	switch item.Type {
 	case "box":

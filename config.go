@@ -1,4 +1,4 @@
-// Config is the persisted attribute shape and the Item type plus
+// Config is the persisted attribute shape and the visuals.Item type plus
 // validators. Separated from service.go so the schema is easy to
 // scan.
 package exampleviz
@@ -64,8 +64,8 @@ type PoseJSON struct {
 	Theta *float64 `json:"theta,omitempty"`
 }
 
-func (p *PoseJSON) toPose() Pose {
-	out := Pose{OZ: 1.0}
+func (p *PoseJSON) toPose() visuals.Pose {
+	out := visuals.Pose{OZ: 1.0}
 	if p == nil {
 		return out
 	}
@@ -111,11 +111,11 @@ type ColorJSON struct {
 	B int `json:"b"`
 }
 
-func (c *ColorJSON) toColor() *Color {
+func (c *ColorJSON) toColor() *visuals.Color {
 	if c == nil {
 		return nil
 	}
-	return &Color{R: c.R, G: c.G, B: c.B}
+	return &visuals.Color{R: c.R, G: c.G, B: c.B}
 }
 
 // AnimationJSON parses the per-item animation block. Different
@@ -145,8 +145,8 @@ type AnimationJSON struct {
 	GoneS             *float64   `json:"gone_s,omitempty"`
 }
 
-func (a *AnimationJSON) toAnimation() Animation {
-	out := Animation{Mode: "none"}
+func (a *AnimationJSON) toAnimation() visuals.Animation {
+	out := visuals.Animation{Mode: "none"}
 	if a == nil {
 		return out
 	}
@@ -219,12 +219,12 @@ func (a *AnimationJSON) toAnimation() Animation {
 	return out
 }
 
-// Item has moved to the visuals subpackage; the alias in aliases.go
+// visuals.Item has moved to the visuals subpackage; the alias in aliases.go
 // keeps unqualified references working. ItemConfig.toItem() produces
 // the same struct, now living in the library namespace.
 
-func (ic ItemConfig) toItem() Item {
-	out := Item{
+func (ic ItemConfig) toItem() visuals.Item {
+	out := visuals.Item{
 		Type:           ic.Type,
 		Label:          ic.Label,
 		ParentFrame:    ic.ParentFrame,
@@ -241,7 +241,7 @@ func (ic ItemConfig) toItem() Item {
 		Animation:      ic.Animation.toAnimation(),
 	}
 	if ic.DimsMM != nil {
-		out.DimsMM = BoxDims{X: ic.DimsMM.X, Y: ic.DimsMM.Y, Z: ic.DimsMM.Z}
+		out.DimsMM = visuals.BoxDims{X: ic.DimsMM.X, Y: ic.DimsMM.Y, Z: ic.DimsMM.Z}
 		out.HasDims = true
 	}
 	if ic.RadiusMM != nil {
@@ -303,9 +303,9 @@ func validateItem(it ItemConfig, path string, idx int) error {
 	if it.Animation != nil && it.Animation.Mode != "" {
 		mode = it.Animation.Mode
 	}
-	if !contains(SupportedModes, mode) {
+	if !contains(visuals.SupportedModes, mode) {
 		return fmt.Errorf("%s unknown animation.mode %q; expected one of %v",
-			where, mode, SupportedModes)
+			where, mode, visuals.SupportedModes)
 	}
 	if mode == "trajectory" {
 		if it.Animation == nil || len(it.Animation.Waypoints) < 2 {

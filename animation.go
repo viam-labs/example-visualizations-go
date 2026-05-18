@@ -1,6 +1,6 @@
-// Animation modes for the example-visualizations-go playground.
+// visuals.Animation modes for the example-visualizations-go playground.
 //
-// An Item's Animation block selects a mode and per-mode params. At
+// An visuals.Item's visuals.Animation block selects a mode and per-mode params. At
 // each tick, ComputeTick returns the per-item pose + geometry
 // overrides for time t (seconds since the animation started) plus
 // the field-mask paths the viewer needs in the UPDATED event.
@@ -14,26 +14,28 @@ package exampleviz
 
 import (
 	"math"
+
+	"exampleviz/visuals"
 )
 
-// The path constants, SupportedModes, lifecycle convention colors,
-// Animation, IsAnimated, Overrides, and BoxDims types have moved to
+// The path constants, visuals.SupportedModes, lifecycle convention colors,
+// visuals.Animation, visuals.IsAnimated, visuals.Overrides, and visuals.BoxDims types have moved to
 // the `visuals` subpackage. This file now just hosts the tick code
 // that consumes them. See aliases.go for the unqualified re-exports
 // that keep the rest of the package's references working.
 
-// BaseGeom + TickResult moved to viam-visuals visuals package; the
+// visuals.BaseGeom + visuals.TickResult moved to viam-visuals visuals package; the
 // aliases in aliases.go re-export them under the unqualified names.
 
 // ComputeTick is the pure per-tick animation function. Given an item
-// (whose Type and Animation are read), base pose, base geometry,
+// (whose Type and visuals.Animation are read), base pose, base geometry,
 // and time t in seconds since the animation started, returns:
 //
 //   - new pose: full pose with animation deltas composed onto base
 //   - new geom: geometry overrides; fields not touched pass through
 //   - paths: ordered list of field-mask paths for the UPDATED event
 //   - overrides: optional metadata override (color/opacity/in_scene)
-func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, t float64) TickResult {
+func ComputeTick(itemType string, anim visuals.Animation, base visuals.Pose, baseGeom visuals.BaseGeom, t float64) visuals.TickResult {
 	newPose := base
 	if newPose.OX == 0 && newPose.OY == 0 && newPose.OZ == 0 {
 		newPose.OZ = 1.0
@@ -47,7 +49,7 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 
 	switch mode {
 	case "none":
-		return TickResult{Pose: newPose, Geom: newGeom}
+		return visuals.TickResult{Pose: newPose, Geom: newGeom}
 
 	case "orbit":
 		radius := anim.RadiusMM
@@ -61,11 +63,11 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 		angle := 2 * math.Pi * t / period
 		newPose.X = base.X + radius*math.Cos(angle)
 		newPose.Y = base.Y + radius*math.Sin(angle)
-		return TickResult{Pose: newPose, Geom: newGeom, Paths: []string{PathX, PathY}}
+		return visuals.TickResult{Pose: newPose, Geom: newGeom, Paths: []string{visuals.PathX, visuals.PathY}}
 
 	case "oscillate":
 		axis := anim.Axis
-		if !contains(SupportedAxes, axis) {
+		if !contains(visuals.SupportedAxes, axis) {
 			axis = "y"
 		}
 		amp := anim.AmplitudeMM
@@ -80,13 +82,13 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 		switch axis {
 		case "x":
 			newPose.X = base.X + delta
-			return TickResult{Pose: newPose, Geom: newGeom, Paths: []string{PathX}}
+			return visuals.TickResult{Pose: newPose, Geom: newGeom, Paths: []string{visuals.PathX}}
 		case "z":
 			newPose.Z = base.Z + delta
-			return TickResult{Pose: newPose, Geom: newGeom, Paths: []string{PathZ}}
+			return visuals.TickResult{Pose: newPose, Geom: newGeom, Paths: []string{visuals.PathZ}}
 		default:
 			newPose.Y = base.Y + delta
-			return TickResult{Pose: newPose, Geom: newGeom, Paths: []string{PathY}}
+			return visuals.TickResult{Pose: newPose, Geom: newGeom, Paths: []string{visuals.PathY}}
 		}
 
 	case "spin":
@@ -96,7 +98,7 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 		}
 		theta := math.Mod(360.0*t/period, 360.0)
 		newPose.Theta = theta
-		return TickResult{Pose: newPose, Geom: newGeom, Paths: []string{PathTheta}}
+		return visuals.TickResult{Pose: newPose, Geom: newGeom, Paths: []string{visuals.PathTheta}}
 
 	case "swing":
 		ampDeg := anim.AmplitudeDeg
@@ -109,7 +111,7 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 		}
 		baseTheta := base.Theta
 		newPose.Theta = baseTheta + ampDeg*math.Sin(2*math.Pi*t/period)
-		return TickResult{Pose: newPose, Geom: newGeom, Paths: []string{PathTheta}}
+		return visuals.TickResult{Pose: newPose, Geom: newGeom, Paths: []string{visuals.PathTheta}}
 
 	case "pulse":
 		amp := anim.AmplitudeMM
@@ -124,43 +126,43 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 		switch itemType {
 		case "sphere":
 			newGeom.RadiusMM = math.Max(0.1, baseGeom.RadiusMM+delta)
-			return TickResult{Pose: newPose, Geom: newGeom, Paths: []string{PathSphereRadius}}
+			return visuals.TickResult{Pose: newPose, Geom: newGeom, Paths: []string{visuals.PathSphereRadius}}
 		case "capsule":
 			newGeom.RadiusMM = math.Max(0.1, baseGeom.RadiusMM+delta)
 			newGeom.LengthMM = math.Max(0.1, baseGeom.LengthMM+delta)
-			return TickResult{Pose: newPose, Geom: newGeom, Paths: []string{PathCapsuleRadius, PathCapsuleLength}}
+			return visuals.TickResult{Pose: newPose, Geom: newGeom, Paths: []string{visuals.PathCapsuleRadius, visuals.PathCapsuleLength}}
 		case "box":
 			boxAxis := anim.Axis
 			d := baseGeom.Dims
 			switch boxAxis {
 			case "x":
-				newGeom.Dims = BoxDims{X: math.Max(0.1, d.X+delta), Y: d.Y, Z: d.Z}
+				newGeom.Dims = visuals.BoxDims{X: math.Max(0.1, d.X+delta), Y: d.Y, Z: d.Z}
 				newGeom.HasDims = true
-				return TickResult{Pose: newPose, Geom: newGeom, Paths: []string{PathBoxDimsX}}
+				return visuals.TickResult{Pose: newPose, Geom: newGeom, Paths: []string{visuals.PathBoxDimsX}}
 			case "y":
-				newGeom.Dims = BoxDims{X: d.X, Y: math.Max(0.1, d.Y+delta), Z: d.Z}
+				newGeom.Dims = visuals.BoxDims{X: d.X, Y: math.Max(0.1, d.Y+delta), Z: d.Z}
 				newGeom.HasDims = true
-				return TickResult{Pose: newPose, Geom: newGeom, Paths: []string{PathBoxDimsY}}
+				return visuals.TickResult{Pose: newPose, Geom: newGeom, Paths: []string{visuals.PathBoxDimsY}}
 			case "z":
-				newGeom.Dims = BoxDims{X: d.X, Y: d.Y, Z: math.Max(0.1, d.Z+delta)}
+				newGeom.Dims = visuals.BoxDims{X: d.X, Y: d.Y, Z: math.Max(0.1, d.Z+delta)}
 				newGeom.HasDims = true
-				return TickResult{Pose: newPose, Geom: newGeom, Paths: []string{PathBoxDimsZ}}
+				return visuals.TickResult{Pose: newPose, Geom: newGeom, Paths: []string{visuals.PathBoxDimsZ}}
 			default:
-				newGeom.Dims = BoxDims{
+				newGeom.Dims = visuals.BoxDims{
 					X: math.Max(0.1, d.X+delta),
 					Y: math.Max(0.1, d.Y+delta),
 					Z: math.Max(0.1, d.Z+delta),
 				}
 				newGeom.HasDims = true
-				return TickResult{Pose: newPose, Geom: newGeom, Paths: []string{PathBoxDimsX, PathBoxDimsY, PathBoxDimsZ}}
+				return visuals.TickResult{Pose: newPose, Geom: newGeom, Paths: []string{visuals.PathBoxDimsX, visuals.PathBoxDimsY, visuals.PathBoxDimsZ}}
 			}
 		default:
-			return TickResult{Pose: newPose, Geom: newGeom}
+			return visuals.TickResult{Pose: newPose, Geom: newGeom}
 		}
 
 	case "trajectory":
 		if len(anim.Waypoints) < 2 {
-			return TickResult{Pose: newPose, Geom: newGeom}
+			return visuals.TickResult{Pose: newPose, Geom: newGeom}
 		}
 		duration := anim.DurationS
 		if duration <= 0 {
@@ -207,8 +209,8 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 			newPose.OX, newPose.OY, newPose.OZ = 0, 0, 1
 		}
 		newPose.Theta = lerp(a.Theta, b.Theta, alpha)
-		return TickResult{Pose: newPose, Geom: newGeom, Paths: []string{
-			PathX, PathY, PathZ, PathOX, PathOY, PathOZ, PathTheta,
+		return visuals.TickResult{Pose: newPose, Geom: newGeom, Paths: []string{
+			visuals.PathX, visuals.PathY, visuals.PathZ, visuals.PathOX, visuals.PathOY, visuals.PathOZ, visuals.PathTheta,
 		}}
 
 	case "force_vector":
@@ -255,14 +257,14 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 		}
 		hue := math.Mod(t*colorSpeed/period, 1.0)
 		r, g, b := hsvToRGBu8(hue, 1, 1)
-		col := Color{R: r, G: g, B: b}
-		return TickResult{Pose: newPose, Geom: newGeom,
+		col := visuals.Color{R: r, G: g, B: b}
+		return visuals.TickResult{Pose: newPose, Geom: newGeom,
 			Paths: []string{
-				PathCapsuleLength, PathSphereRadius,
-				PathOX, PathOY, PathOZ, PathTheta,
-				PathMetadataColor,
+				visuals.PathCapsuleLength, visuals.PathSphereRadius,
+				visuals.PathOX, visuals.PathOY, visuals.PathOZ, visuals.PathTheta,
+				visuals.PathMetadataColor,
 			},
-			Overrides: &Overrides{Color: &col},
+			Overrides: &visuals.Overrides{Color: &col},
 		}
 
 	case "breathe":
@@ -274,7 +276,7 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 		if amp == 0 {
 			amp = 0.4
 		}
-		// baseOpacity isn't carried in BaseGeom; defaults to 1.0 if
+		// baseOpacity isn't carried in visuals.BaseGeom; defaults to 1.0 if
 		// the item didn't set it. Callers can plumb item.Opacity if
 		// they want this to compose onto a non-1.0 base.
 		baseOp := 1.0
@@ -285,9 +287,9 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 		if op > 1 {
 			op = 1
 		}
-		return TickResult{Pose: newPose, Geom: newGeom,
-			Paths:     []string{PathMetadataOpac},
-			Overrides: &Overrides{Opacity: &op},
+		return visuals.TickResult{Pose: newPose, Geom: newGeom,
+			Paths:     []string{visuals.PathMetadataOpac},
+			Overrides: &visuals.Overrides{Opacity: &op},
 		}
 
 	case "flicker":
@@ -308,8 +310,8 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 		phaseOff := anim.PhaseOffsetS
 		phase := math.Mod(t+phaseOff, period) / period
 		inScene := phase < duty
-		return TickResult{Pose: newPose, Geom: newGeom,
-			Overrides: &Overrides{InScene: &inScene},
+		return visuals.TickResult{Pose: newPose, Geom: newGeom,
+			Overrides: &visuals.Overrides{InScene: &inScene},
 		}
 
 	case "lifecycle":
@@ -336,7 +338,7 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 		}
 		periodTotal := appear + alive + disappear + gone
 		if periodTotal <= 0 {
-			return TickResult{Pose: newPose, Geom: newGeom}
+			return visuals.TickResult{Pose: newPose, Geom: newGeom}
 		}
 		var phaseT float64
 		if loop {
@@ -344,27 +346,27 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 		} else {
 			phaseT = math.Min(t+phaseOff, periodTotal)
 		}
-		var color Color
+		var color visuals.Color
 		var opacity float64
 		inScene := true
 		switch {
 		case phaseT < appear:
-			color = LifecycleColorAppearing
-			opacity = LifecycleOpacityAppearing
+			color = visuals.LifecycleColorAppearing
+			opacity = visuals.LifecycleOpacityAppearing
 		case phaseT < appear+alive:
-			color = LifecycleColorAlive
-			opacity = LifecycleOpacityAlive
+			color = visuals.LifecycleColorAlive
+			opacity = visuals.LifecycleOpacityAlive
 		case phaseT < appear+alive+disappear:
-			color = LifecycleColorDisappearing
-			opacity = LifecycleOpacityDispearing
+			color = visuals.LifecycleColorDisappearing
+			opacity = visuals.LifecycleOpacityDispearing
 		default:
-			color = LifecycleColorDisappearing
+			color = visuals.LifecycleColorDisappearing
 			opacity = 0
 			inScene = false
 		}
-		return TickResult{Pose: newPose, Geom: newGeom,
-			Paths: []string{PathMetadataColor, PathMetadataOpac},
-			Overrides: &Overrides{
+		return visuals.TickResult{Pose: newPose, Geom: newGeom,
+			Paths: []string{visuals.PathMetadataColor, visuals.PathMetadataOpac},
+			Overrides: &visuals.Overrides{
 				Color:   &color,
 				Opacity: &opacity,
 				InScene: &inScene,
@@ -373,7 +375,7 @@ func ComputeTick(itemType string, anim Animation, base Pose, baseGeom BaseGeom, 
 	}
 
 	// Unknown mode falls through as static.
-	return TickResult{Pose: newPose, Geom: newGeom}
+	return visuals.TickResult{Pose: newPose, Geom: newGeom}
 }
 
 func contains(ss []string, s string) bool {

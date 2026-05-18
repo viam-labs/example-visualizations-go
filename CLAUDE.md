@@ -25,7 +25,6 @@ geometries.go           # Proto builders: build_box/sphere/capsule/point/arrow/m
 animation.go            # 11 modes: none, orbit, oscillate, spin, swing, pulse, trajectory, force_vector, breathe, flicker, lifecycle. ComputeTick returns TickResult{Pose, Geom, Paths, Overrides}. camelCase field-mask path constants.
 config.go               # Config + ItemConfig (JSON-parsed) + Item (runtime). Validate() runs schema checks.
 presets.go              # 9 presets used by standalone-playground.
-aliases.go              # Unqualified re-exports of visuals.* types so the long-lived module files (presets.go, animation.go, etc.) compile without visuals. prefixes. Transitional — slated for removal in a dedicated pass.
 cmd/module/main.go      # module.ModularMain entrypoint — registers all three models.
 
 visuals/                # The typed visualization library (planned ViamVizHelpers Go).

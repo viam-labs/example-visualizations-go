@@ -24,9 +24,9 @@ import (
 // SupportedTypes — closed set of item.type values (config-level).
 var SupportedTypes = []string{"box", "sphere", "capsule", "point", "arrow", "mesh", "pointcloud"}
 
-// buildPose converts the JSON-shape Pose to commonpb.Pose. If the
+// buildPose converts the JSON-shape visuals.Pose to commonpb.Pose. If the
 // caller didn't set any of OX/OY/OZ, we default OZ=1 (identity).
-func buildPose(p Pose) *commonpb.Pose {
+func buildPose(p visuals.Pose) *commonpb.Pose {
 	oz := p.OZ
 	if p.OX == 0 && p.OY == 0 && p.OZ == 0 {
 		oz = 1.0

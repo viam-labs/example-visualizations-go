@@ -9,7 +9,7 @@
 //
 // Typical use:
 //
-//	import "exampleviz/visuals"
+//	import "github.com/viam-labs/viam-viz-helpers-go/visuals"
 //
 //	box := visuals.Box{Label: "demo_box",
 //	    DimsMM: visuals.BoxDims{X: 100, Y: 200, Z: 50},

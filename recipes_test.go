@@ -203,8 +203,8 @@ func TestDetectionsOverlay_OrbitCirclesOrigin(t *testing.T) {
 	if v == nil {
 		t.Fatal("det_0 not in scene")
 	}
-	// BoundingBox (solid variant) expands into a single Box;
-	// composites return Box as a value (vs. *Box for direct
+	// visuals.BoundingBox (solid variant) expands into a single visuals.Box;
+	// composites return visuals.Box as a value (vs. *visuals.Box for direct
 	// driver-side usage), so the scene stores it by value here.
 	b, ok := v.(visuals.Box)
 	if !ok {
@@ -280,7 +280,7 @@ func TestTrajectoryRunner_InitialInstallsPlanAndRunner(t *testing.T) {
 	if scene.Get("trajectory_runner") == nil {
 		t.Error("trajectory_runner missing")
 	}
-	// Each waypoint should be a full CoordinateFrame triad.
+	// Each waypoint should be a full visuals.CoordinateFrame triad.
 	for i := 0; i < 5; i++ {
 		anchor := fmt.Sprintf("trajectory_wp_%d", i)
 		if scene.Get(anchor) == nil {
@@ -606,7 +606,7 @@ func TestYOrigin_ShiftsMarchingBoxes(t *testing.T) {
 	v := scene.Get("march_0")
 	box, ok := v.(*visuals.Box)
 	if !ok {
-		t.Fatalf("expected *Box, got %T", v)
+		t.Fatalf("expected *visuals.Box, got %T", v)
 	}
 	if box.Pose.Y != -1500 {
 		t.Errorf("expected y=-1500, got %v", box.Pose.Y)
@@ -621,7 +621,7 @@ func TestYOrigin_ShiftsCoordinateFramesArm(t *testing.T) {
 	if frame == nil {
 		t.Fatal("frame_0 missing")
 	}
-	// Composite-stored as value-typed Sphere.
+	// visuals.Composite-stored as value-typed visuals.Sphere.
 	if sphere, ok := frame.(visuals.Sphere); ok {
 		if sphere.Pose.Y != 1600 {
 			t.Errorf("frame_0.y = %v, want 1600", sphere.Pose.Y)

@@ -156,10 +156,10 @@ func pulsingLabel(i int) string {
 //
 // Driver-side equivalent of the standalone-playground "primitives"
 // preset. Useful as the "what can I put in a Scene" reference: each
-// shape type appears in a row along X. Static — the driver pushes
+// shape type appears in a row along X. visuals.Static — the driver pushes
 // ADDED events on startup and nothing thereafter.
 //
-// Note that Mesh and PointCloud items reference asset paths that
+// Note that visuals.Mesh and visuals.PointCloud items reference asset paths that
 // the *visualizer* resolves at install time. As long as the driver
 // and visualizer ship from the same module binary (the default with
 // the in-process registry), the visualizer's ReadAsset hook finds
@@ -246,13 +246,13 @@ func (AllPrimitives) Tick(scene *visuals.Scene, t float64) []visuals.SceneEvent 
 // circular paths.
 //
 // Uses visuals.BoundingBox with Wireframe=false (a single solid
-// Box per detection). The translucent opacity keeps the underlying
+// visuals.Box per detection). The translucent opacity keeps the underlying
 // scene visible through the overlay, mirroring how most perception
 // output is rendered (YOLO, Google Cloud Vision, etc.).
 //
-// Note: BoundingBox{Wireframe: true} expands into 12 capsule edges
+// Note: visuals.BoundingBox{Wireframe: true} expands into 12 capsule edges
 // positioned via ParentFrame chaining, but doesn't honor the
-// composite's Pose directly today. Solid is the right choice here;
+// composite's visuals.Pose directly today. Solid is the right choice here;
 // wireframe is a future direction once an anchor-frame pattern is
 // wired into the recipe.
 type DetectionsOverlay struct {
@@ -307,7 +307,7 @@ func detectionLabel(i int) string {
 // ---- coordinate_frames_arm --------------------------------------------
 
 // CoordinateFramesArm — three spinning coordinate-frame triads + an
-// articulated arm. Demonstrates composite expansion (CoordinateFrame
+// articulated arm. Demonstrates composite expansion (visuals.CoordinateFrame
 // → 4 visuals) and chained parent_frame propagation (each arm link
 // parents to the previous link's label).
 //
@@ -473,7 +473,7 @@ func (cf CoordinateFramesArm) Tick(scene *visuals.Scene, t float64) []visuals.Sc
 // the planner's joint output.
 //
 // Built on the visuals.TrajectoryPlan composite (static line +
-// per-waypoint CoordinateFrame triads) plus visuals.LerpPose for
+// per-waypoint visuals.CoordinateFrame triads) plus visuals.LerpPose for
 // the runner's between-waypoint interpolation. To preview a real
 // motion plan, swap trWaypoints for the planner's pose list — the
 // rest of the recipe is plan-agnostic.
@@ -730,18 +730,18 @@ func (lg *LifecycleGarden) opacityFor(phase string) float64 {
 
 // ---- force_vector -----------------------------------------------------
 
-// ForceVector — animated force-vector arrow: length, radius, and
+// visuals.ForceVector — animated force-vector arrow: length, radius, and
 // orientation all cycling simultaneously.
 //
 // Mirrors the standalone-playground's force_vector_demo preset.
 // The arrow's length and radius oscillate on phase-offset sine
 // waves; orientation precesses around world +Z at a fixed tilt.
-// Color cycling (the standalone preset's hue sweep) is not included
+// visuals.Color cycling (the standalone preset's hue sweep) is not included
 // because metadata updates don't propagate via UPDATED — only at
 // spawn time. To add color cycling, use the label-rotation pattern
 // from BreathingShapes.
-// (Named ForceVectorRecipe — the unqualified “ForceVector“ is
-// already taken by the visuals AnimationSpec alias in aliases.go.)
+// (Named ForceVectorRecipe — the unqualified “visuals.ForceVector“ is
+// already taken by the visuals visuals.AnimationSpec alias in aliases.go.)
 type ForceVectorRecipe struct {
 	YOrigin float64
 }

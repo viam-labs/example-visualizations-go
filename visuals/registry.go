@@ -12,7 +12,7 @@
 // Usage on the upstream side (e.g. a visualizer service that wants
 // to be addressable in-process):
 //
-//	import "exampleviz/visuals"
+//	import "github.com/viam-labs/viam-viz-helpers-go/visuals"
 //
 //	func newVisualizer(...) (worldstatestore.Service, error) {
 //	    s := &visualizer{...}

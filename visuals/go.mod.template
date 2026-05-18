@@ -1,0 +1,19 @@
+// Activated on extraction to github.com/viam-labs/viam-viz-helpers-go.
+// Until then, the visuals package is a subpackage of exampleviz; the
+// parent module's go.mod (../go.mod) handles all dependencies.
+//
+// On extraction, rename this file to go.mod and tidy:
+//   mv go.mod.template go.mod
+//   go mod tidy
+//
+// The expected content:
+
+module github.com/viam-labs/viam-viz-helpers-go
+
+go 1.25.1
+
+require (
+	go.viam.com/api v0.1.496
+	go.viam.com/rdk v0.105.0
+	google.golang.org/protobuf v1.36.10
+)

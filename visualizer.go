@@ -146,7 +146,7 @@ func (pv *playgroundVisualizer) Close(ctx context.Context) error {
 // can never load a preset — there's no items/preset config path
 // to here, but make doubly sure by failing fast if any code path
 // somehow asks for one. The DoCommand "preset" verb routes here.
-func (pv *playgroundVisualizer) LoadPreset(name string) ([]Item, error) {
+func (pv *playgroundVisualizer) LoadPreset(name string) ([]visuals.Item, error) {
 	return nil, fmt.Errorf("playground-visualizer doesn't support presets — push items via apply_events from a driver")
 }
 

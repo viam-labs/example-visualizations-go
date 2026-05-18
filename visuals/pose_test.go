@@ -33,11 +33,11 @@ func rotationsEquivalent(q1, q2 [4]float64, tol float64) bool {
 
 func TestOVToQuatRoundTripPreservesRotation(t *testing.T) {
 	cases := [][4]float64{
-		{0, 0, 1, 0},                  // identity
-		{0, 0, 1, 90},                 // roll around world Z
-		{1, 0, 0, 0},                  // local Z → world +X
-		{0, 1, 0, 0},                  // local Z → world +Y
-		{0, 0, -1, 0},                 // flipped
+		{0, 0, 1, 0},  // identity
+		{0, 0, 1, 90}, // roll around world Z
+		{1, 0, 0, 0},  // local Z → world +X
+		{0, 1, 0, 0},  // local Z → world +Y
+		{0, 0, -1, 0}, // flipped
 		{1 / math.Sqrt2, 0, 1 / math.Sqrt2, 45},
 		{0.5, 0.5, 1 / math.Sqrt2, 30},
 	}
