@@ -109,23 +109,28 @@ func LerpPose(a, b Pose, t float64) Pose {
 	}
 }
 
+// poleRadius matches RDK's orientationVectorPoleRadius / defaultAngleEpsilon
+// — the threshold at which the renderer switches to pole math on OZ. Both
+// our forward and inverse use it so the round-trip is consistent with the
+// renderer's interpretation.
+const poleRadius = 1e-4
+
 // ovToQuat converts a Viam orientation vector + theta (degrees) to a
 // unit quaternion (w, x, y, z).
 //
 // Uses the ZYZ Euler decomposition: R = R_z(phi) R_y(delta) R_z(theta_rad)
 // where phi = atan2(OY, OX) and delta = acos(OZ). At the singularity
-// |OZ| ≈ 1 (local Z aligned with world ±Z), phi is undefined; we
-// collapse it into theta.
+// |OZ| ≈ 1, phi is folded into theta — matches RDK exactly.
 func ovToQuat(ox, oy, oz, thetaDeg float64) [4]float64 {
 	theta := thetaDeg * math.Pi / 180.0
-	sinDeltaSq := ox*ox + oy*oy
 	halfT := theta / 2
-	if sinDeltaSq < 1e-12 {
+	if 1-math.Abs(oz) <= poleRadius {
 		if oz >= 0 {
 			return [4]float64{math.Cos(halfT), 0, 0, math.Sin(halfT)}
 		}
-		// oz=-1: 180° rotation around world Y composed with the roll.
-		return [4]float64{0, -math.Sin(halfT), math.Cos(halfT), 0}
+		// R = R_z(0) R_y(pi) R_z(theta) = q_y(pi) * q_z(theta)
+		// = (0, 0, 1, 0) * (cos(t/2), 0, 0, sin(t/2)) = (0, sin(t/2), cos(t/2), 0)
+		return [4]float64{0, math.Sin(halfT), math.Cos(halfT), 0}
 	}
 	phi := math.Atan2(oy, ox)
 	clampedOZ := oz
@@ -147,29 +152,82 @@ func ovToQuat(ox, oy, oz, thetaDeg float64) [4]float64 {
 	}
 }
 
-// quatToOV is the inverse of ovToQuat. Returns (OX, OY, OZ, thetaDeg).
+// quatToOV is the inverse of ovToQuat. Ported from RDK's
+// spatialmath.QuatToOV so the renderer's reconstruction of R from the
+// emitted (OX, OY, OZ, theta) tuple matches the SLERP'd quaternion
+// exactly — no per-tick R jump as the interpolation approaches the
+// |OZ|=1 singularity.
 func quatToOV(w, x, y, z float64) (float64, float64, float64, float64) {
-	ox := 2 * (x*z + w*y)
-	oy := 2 * (y*z - w*x)
-	oz := 1 - 2*(x*x+y*y)
-	if n := math.Sqrt(ox*ox + oy*oy + oz*oz); n > 1e-9 {
-		ox, oy, oz = ox/n, oy/n, oz/n
+	// Rotated +Z (newZ) and rotated -X (newX), per RDK convention.
+	nz := [3]float64{
+		2 * (x*z + w*y),
+		2 * (y*z - w*x),
+		1 - 2*(x*x+y*y),
 	}
+	nx := [3]float64{
+		-(1 - 2*(y*y+z*z)),
+		-(2 * (x*y + w*z)),
+		-(2 * (x*z - w*y)),
+	}
+	ox, oy, oz := nz[0], nz[1], nz[2]
+
 	var theta float64
-	sinDeltaSq := ox*ox + oy*oy
-	if sinDeltaSq < 1e-12 {
-		// At the singularity, phi and theta are degenerate — extract
-		// the total rotation around world Z. The oz=-1 branch matches
-		// the forward convention in ovToQuat.
-		if oz >= 0 {
-			theta = math.Atan2(2*(w*z+x*y), 1-2*(y*y+z*z))
+	if 1-math.Abs(oz) > poleRadius {
+		// Non-pole: theta is the angle between the plane (newZ, newX, origin)
+		// and the plane (newZ, world+Z, origin), measured around newZ.
+		n1 := [3]float64{
+			nz[1]*nx[2] - nz[2]*nx[1],
+			nz[2]*nx[0] - nz[0]*nx[2],
+			nz[0]*nx[1] - nz[1]*nx[0],
+		}
+		n2 := [3]float64{nz[1], -nz[0], 0}
+		n1DotN2 := n1[0]*n2[0] + n1[1]*n2[1] + n1[2]*n2[2]
+		n1Len := math.Sqrt(n1[0]*n1[0] + n1[1]*n1[1] + n1[2]*n1[2])
+		n2Len := math.Sqrt(n2[0]*n2[0] + n2[1]*n2[1] + n2[2]*n2[2])
+		denom := n1Len * n2Len
+		if denom == 0 {
+			return ox, oy, oz, 0
+		}
+		cosTheta := n1DotN2 / denom
+		if cosTheta > 1 {
+			cosTheta = 1
+		} else if cosTheta < -1 {
+			cosTheta = -1
+		}
+		theta = math.Acos(cosTheta)
+		if theta > poleRadius {
+			// Sign disambiguation: rotate newZ by -theta around (ox, oy, oz)
+			// and check whether the result is coplanar with (newZ, world+Z).
+			halfT := -theta / 2
+			sinH := math.Sin(halfT)
+			q2w, q2x, q2y, q2z := math.Cos(halfT), ox*sinH, oy*sinH, oz*sinH
+			tz := [3]float64{
+				2 * (q2x*q2z + q2w*q2y),
+				2 * (q2y*q2z - q2w*q2x),
+				1 - 2*(q2x*q2x+q2y*q2y),
+			}
+			n3 := [3]float64{
+				nz[1]*tz[2] - nz[2]*tz[1],
+				nz[2]*tz[0] - nz[0]*tz[2],
+				nz[0]*tz[1] - nz[1]*tz[0],
+			}
+			n3Len := math.Sqrt(n3[0]*n3[0] + n3[1]*n3[1] + n3[2]*n3[2])
+			if n3Len > 0 {
+				cosTest := (n1[0]*n3[0] + n1[1]*n3[1] + n1[2]*n3[2]) / (n1Len * n3Len)
+				if 1-cosTest < poleRadius*poleRadius {
+					theta = -theta
+				}
+			}
 		} else {
-			theta = math.Atan2(2*(w*z-x*y), 2*(y*y+z*z)-1)
+			theta = 0
 		}
 	} else {
-		r20 := 2 * (x*z - w*y)
-		r21 := 2 * (y*z + w*x)
-		theta = math.Atan2(r21, -r20)
+		// Pole: extract from the rotated -X direction.
+		if oz >= 0 {
+			theta = -math.Atan2(nx[1], -nx[0])
+		} else {
+			theta = -math.Atan2(nx[1], nx[0])
+		}
 	}
 	return ox, oy, oz, theta * 180.0 / math.Pi
 }
