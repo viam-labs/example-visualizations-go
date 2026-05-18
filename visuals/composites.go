@@ -40,10 +40,10 @@ type CoordinateFrame struct {
 	SizeMM         float64
 	ParentFrame    string
 	Animation      AnimationSpec
-	ShowAxesHelper *bool    // nil → true (use ptrB(false) to disable)
+	ShowAxesHelper *bool // nil → true (use ptrB(false) to disable)
 	AnchorRadiusMM float64
 	AxisRadiusMM   float64
-	AxisLengthMM   float64  // 0 → use SizeMM
+	AxisLengthMM   float64 // 0 → use SizeMM
 	AnchorColor    *Color
 	AnchorOpacity  *float64
 	AxisColorX     *Color
@@ -278,3 +278,125 @@ func ArrowFromTo(label string, start, end Pose, radiusMM float64) Arrow {
 
 // ptrF is an internal helper to take a float64 by pointer.
 func ptrF(v float64) *float64 { return &v }
+
+// TrajectoryPlan — visualization for a motion plan (list of poses
+// with orientation). Expands to a polyline connecting the waypoints
+// plus a CoordinateFrame triad at each waypoint so the orientation
+// at each step is visible.
+//
+// Designed to match the shape of motion-planner output (CBiRRT,
+// RRT*, motion-service plans). After forward-kinematics on the
+// planner's joint-position output, each step is a Cartesian pose;
+// pass that list in as Waypoints and the composite renders the plan.
+//
+// Pair with LerpPose to animate a "runner" that walks the plan
+// between adjacent waypoints with smoothly interpolating orientation.
+//
+// Internal labels: line segments use "<LabelPrefix>_path_seg_NN";
+// waypoint frames use "<LabelPrefix>_wp_N" for the anchor and the
+// usual _axis_x/y/z suffixes.
+type TrajectoryPlan struct {
+	LabelPrefix string
+	Waypoints   []Pose
+	ParentFrame string
+
+	// Path line styling.
+	LineColor   *Color
+	LineWidthMM float64
+	LineOpacity *float64
+
+	// Per-waypoint CoordinateFrame styling.
+	ShowFrames          bool // default false → true; set ShowFramesOverride
+	ShowFramesOverride  *bool
+	FrameSizeMM         float64
+	FrameAnchorRadiusMM float64
+	FrameAxisRadiusMM   float64
+	FrameAnchorColor    *Color
+	FrameAnchorOpacity  *float64
+	FrameAxisOpacity    *float64
+	FrameShowAxesHelper *bool // nil → false (the explicit arrows are the show)
+}
+
+// ToVisuals expands the plan into a Line composite plus N
+// CoordinateFrames.
+func (tp TrajectoryPlan) ToVisuals() []Visual {
+	must(len(tp.Waypoints) >= 2,
+		"TrajectoryPlan needs at least 2 waypoints; got %d", len(tp.Waypoints))
+
+	lineColor := tp.LineColor
+	if lineColor == nil {
+		lineColor = &Color{R: 100, G: 180, B: 220}
+	}
+	lineWidth := tp.LineWidthMM
+	if lineWidth <= 0 {
+		lineWidth = 6.0
+	}
+	lineOpacity := tp.LineOpacity
+	if lineOpacity == nil {
+		lineOpacity = ptrF(0.6)
+	}
+	showFrames := true
+	if tp.ShowFramesOverride != nil {
+		showFrames = *tp.ShowFramesOverride
+	}
+	frameSize := tp.FrameSizeMM
+	if frameSize <= 0 {
+		frameSize = 80.0
+	}
+	frameAnchorR := tp.FrameAnchorRadiusMM
+	if frameAnchorR <= 0 {
+		frameAnchorR = 6.0
+	}
+	frameAxisR := tp.FrameAxisRadiusMM
+	if frameAxisR <= 0 {
+		frameAxisR = 4.0
+	}
+	frameAnchorColor := tp.FrameAnchorColor
+	if frameAnchorColor == nil {
+		frameAnchorColor = &Color{R: 120, G: 120, B: 120}
+	}
+	frameAnchorOp := tp.FrameAnchorOpacity
+	if frameAnchorOp == nil {
+		frameAnchorOp = ptrF(0.5)
+	}
+	frameAxisOp := tp.FrameAxisOpacity
+	if frameAxisOp == nil {
+		frameAxisOp = ptrF(1.0)
+	}
+	frameShowHelper := tp.FrameShowAxesHelper
+	if frameShowHelper == nil {
+		frameShowHelper = ptrB(false)
+	}
+
+	out := []Visual{}
+
+	// Path line.
+	out = append(out, Line{
+		LabelPrefix: tp.LabelPrefix + "_path",
+		Points:      append([]Pose(nil), tp.Waypoints...),
+		WidthMM:     lineWidth,
+		ParentFrame: tp.ParentFrame,
+		Color:       lineColor,
+		Opacity:     lineOpacity,
+	}.ToVisuals()...)
+
+	// Per-waypoint CoordinateFrames.
+	if showFrames {
+		for i, wp := range tp.Waypoints {
+			out = append(out, CoordinateFrame{
+				Label:          fmt.Sprintf("%s_wp_%d", tp.LabelPrefix, i),
+				Pose:           wp,
+				ParentFrame:    tp.ParentFrame,
+				SizeMM:         frameSize,
+				AxisLengthMM:   frameSize,
+				AxisRadiusMM:   frameAxisR,
+				AnchorRadiusMM: frameAnchorR,
+				AnchorColor:    frameAnchorColor,
+				AnchorOpacity:  frameAnchorOp,
+				AxisOpacity:    frameAxisOp,
+				ShowAxesHelper: frameShowHelper,
+			}.ToVisuals()...)
+		}
+	}
+	return out
+}

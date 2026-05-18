@@ -22,6 +22,8 @@
 // github.com/viam-labs/viam-visuals will not change the surface.
 package visuals
 
+import "math"
+
 // Pose is position (mm) + orientation vector + theta.
 //
 // The Viam world-state-store wire format encodes each entity's pose
@@ -69,4 +71,42 @@ func fillPose(p Pose) Pose {
 		p.hasOrient = true
 	}
 	return p
+}
+
+// LerpPose linearly interpolates between two poses.
+//
+// Position (X, Y, Z) and Theta are simple lerps. The orientation
+// vector (OX, OY, OZ) is lerped component-wise then renormalized
+// so the result is still a unit vector (the classic "fast lerp"
+// approximation to SLERP — visually close enough for trajectory
+// playback at typical update rates).
+//
+// t should be in [0, 1]; values outside that range extrapolate (no
+// clamping).
+//
+// Useful for motion-plan playback: feed in two adjacent waypoint
+// poses from a planner output, interpolate the runner's pose at
+// each tick, and the orientation visibly rotates between waypoints.
+func LerpPose(a, b Pose, t float64) Pose {
+	a = fillPose(a)
+	b = fillPose(b)
+	ox := a.OX + (b.OX-a.OX)*t
+	oy := a.OY + (b.OY-a.OY)*t
+	oz := a.OZ + (b.OZ-a.OZ)*t
+	norm := math.Sqrt(ox*ox + oy*oy + oz*oz)
+	if norm > 1e-9 {
+		ox, oy, oz = ox/norm, oy/norm, oz/norm
+	} else {
+		ox, oy, oz = 0, 0, 1
+	}
+	return Pose{
+		X:         a.X + (b.X-a.X)*t,
+		Y:         a.Y + (b.Y-a.Y)*t,
+		Z:         a.Z + (b.Z-a.Z)*t,
+		OX:        ox,
+		OY:        oy,
+		OZ:        oz,
+		Theta:     a.Theta + (b.Theta-a.Theta)*t,
+		hasOrient: true,
+	}
 }

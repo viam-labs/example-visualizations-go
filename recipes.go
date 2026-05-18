@@ -465,68 +465,78 @@ func (cf CoordinateFramesArm) Tick(scene *visuals.Scene, t float64) []visuals.Sc
 // ---- trajectory_runner ------------------------------------------------
 
 // TrajectoryRunner — a "runner" sphere walking through a list of
-// waypoints with linear interpolation. The waypoints and the line
-// connecting them are static; only the runner's pose changes per tick.
+// waypoints, each with its own orientation, with smooth
+// interpolation between. Mirrors the standalone-playground's
+// trajectory_preview preset, and — more importantly — the typical
+// output of a motion planner (CBiRRT, RRT*, motion-service plans):
+// a sequence of Cartesian poses produced by forward-kinematics on
+// the planner's joint output.
+//
+// Built on the visuals.TrajectoryPlan composite (static line +
+// per-waypoint CoordinateFrame triads) plus visuals.LerpPose for
+// the runner's between-waypoint interpolation. To preview a real
+// motion plan, swap trWaypoints for the planner's pose list — the
+// rest of the recipe is plan-agnostic.
 type TrajectoryRunner struct {
 	YOrigin float64
 }
 
 func (TrajectoryRunner) Name() string { return "trajectory_runner" }
 
-// trShifted returns trWaypoints with YOrigin applied.
+const (
+	trLapPeriodS  = 12.0
+	trLabelPrefix = "trajectory"
+)
+
+// Each waypoint carries position AND orientation. The runner's
+// orientation interpolates between adjacent waypoints — the result
+// is visibly different at every t value, not constant along a
+// segment.
+var trWaypoints = []visuals.Pose{
+	visuals.PoseAt(-400, -300, 100, 0, 0, 1, 0), // identity (Z up)
+	visuals.PoseAt(-200, -150, 200, 1, 0, 0, 0), // tipped (X up)
+	visuals.PoseAt(0, 0, 300, 0, 0, 1, 90),      // identity + 90° roll
+	visuals.PoseAt(200, 150, 200, 0, 1, 0, 0),   // tipped (Y up)
+	visuals.PoseAt(400, 300, 100, 0, 0, 1, 0),   // back to identity
+}
+
 func (tr TrajectoryRunner) waypoints() []visuals.Pose {
 	out := make([]visuals.Pose, len(trWaypoints))
 	for i, wp := range trWaypoints {
-		out[i] = visuals.Pose{X: wp.X, Y: wp.Y + tr.YOrigin, Z: wp.Z, OZ: wp.OZ}
+		// Shift Y by YOrigin; preserve orientation verbatim.
+		out[i] = visuals.PoseAt(
+			wp.X, wp.Y+tr.YOrigin, wp.Z,
+			wp.OX, wp.OY, wp.OZ, wp.Theta,
+		)
 	}
 	return out
-}
-
-const (
-	trLapPeriodS = 8.0
-)
-
-var trWaypoints = []visuals.Pose{
-	{X: -400, Y: -300, Z: 100, OZ: 1},
-	{X: -200, Y: -150, Z: 200, OZ: 1},
-	{X: 0, Y: 0, Z: 300, OZ: 1},
-	{X: 200, Y: 150, Z: 200, OZ: 1},
-	{X: 400, Y: 300, Z: 100, OZ: 1},
 }
 
 func (tr TrajectoryRunner) Initial(scene *visuals.Scene) []visuals.SceneEvent {
 	out := []visuals.SceneEvent{}
 	wps := tr.waypoints()
 
-	// Translucent static waypoint markers.
-	wpColor := visuals.Color{R: 120, G: 180, B: 220}
-	wpOpacity := 0.4
-	for i, wp := range wps {
-		marker := &visuals.Sphere{
-			Label:    fmt.Sprintf("wp_%d", i),
-			Pose:     wp,
-			RadiusMM: 30, Color: &wpColor, Opacity: &wpOpacity,
-		}
-		if events, err := scene.Add(marker); err == nil {
-			out = append(out, events...)
-		}
-	}
-
-	// Path line connecting the waypoints.
+	// The whole static plan visualization — line + per-waypoint
+	// coordinate-frame triads — from one composite.
 	lineColor := visuals.Color{R: 120, G: 180, B: 220}
-	lineOpacity := 0.5
-	line := visuals.Line{
-		LabelPrefix: "trajectory",
-		Points:      wps,
-		WidthMM:     6,
-		Color:       &lineColor,
-		Opacity:     &lineOpacity,
+	plan := visuals.TrajectoryPlan{
+		LabelPrefix:         trLabelPrefix,
+		Waypoints:           wps,
+		LineColor:           &lineColor,
+		LineWidthMM:         6,
+		LineOpacity:         ptr(0.5),
+		FrameSizeMM:         80,
+		FrameAxisRadiusMM:   4,
+		FrameAnchorRadiusMM: 8,
+		FrameAnchorOpacity:  ptr(0.5),
+		FrameAxisOpacity:    ptr(0.8),
 	}
-	if events, err := scene.Add(line); err == nil {
+	if events, err := scene.Add(plan); err == nil {
 		out = append(out, events...)
 	}
 
-	// The runner — brighter and larger, with axes helper.
+	// The runner — brighter and larger, with its own axes helper so
+	// its orientation through the arc is unmistakable.
 	runnerColor := visuals.Color{R: 255, G: 200, B: 50}
 	runner := &visuals.Sphere{
 		Label:          "trajectory_runner",
@@ -551,25 +561,15 @@ func (tr TrajectoryRunner) Tick(scene *visuals.Scene, t float64) []visuals.Scene
 	a := wps[segIdx]
 	b := wps[(segIdx+1)%n]
 
-	// Orientation: point along the current segment direction.
-	dx, dy, dz := b.X-a.X, b.Y-a.Y, b.Z-a.Z
-	segLen := math.Sqrt(dx*dx + dy*dy + dz*dz)
-	var ox, oy, oz float64
-	if segLen > 1e-6 {
-		ox, oy, oz = dx/segLen, dy/segLen, dz/segLen
-	} else {
-		oz = 1
-	}
+	// Lerp position + orientation between adjacent waypoints.
+	// LerpPose handles the lerp-and-normalize on the orientation
+	// vector — close enough to SLERP for visual playback.
+	runnerPose := visuals.LerpPose(a, b, local)
 
 	runnerColor := visuals.Color{R: 255, G: 200, B: 50}
 	runner := &visuals.Sphere{
-		Label: "trajectory_runner",
-		Pose: visuals.Pose{
-			X:  a.X + (b.X-a.X)*local,
-			Y:  a.Y + (b.Y-a.Y)*local,
-			Z:  a.Z + (b.Z-a.Z)*local,
-			OX: ox, OY: oy, OZ: oz,
-		},
+		Label:          "trajectory_runner",
+		Pose:           runnerPose,
 		RadiusMM:       55,
 		Color:          &runnerColor,
 		ShowAxesHelper: true,

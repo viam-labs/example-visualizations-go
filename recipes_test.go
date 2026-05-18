@@ -1,6 +1,7 @@
 package exampleviz
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -268,15 +269,23 @@ func TestCoordinateFramesArm_NoEventWhenTUnchanged(t *testing.T) {
 
 // ---- trajectory_runner -----------------------------------------------
 
-func TestTrajectoryRunner_InitialInstallsPathAndRunner(t *testing.T) {
+func TestTrajectoryRunner_InitialInstallsPlanAndRunner(t *testing.T) {
 	scene := visuals.NewScene("world")
 	events := TrajectoryRunner{}.Initial(scene)
-	// 5 waypoints + 4 line segments + 1 runner = 10.
-	if len(events) != 10 {
-		t.Errorf("expected 10 events, got %d", len(events))
+	// TrajectoryPlan expands: 4 line segments + 5 CoordinateFrames
+	// (each = anchor + 3 axes) = 4 + 20 = 24. Plus runner sphere = 25.
+	if len(events) != 25 {
+		t.Errorf("expected 25 events, got %d", len(events))
 	}
 	if scene.Get("trajectory_runner") == nil {
 		t.Error("trajectory_runner missing")
+	}
+	// Each waypoint should be a full CoordinateFrame triad.
+	for i := 0; i < 5; i++ {
+		anchor := fmt.Sprintf("trajectory_wp_%d", i)
+		if scene.Get(anchor) == nil {
+			t.Errorf("missing %q", anchor)
+		}
 	}
 }
 
@@ -426,25 +435,25 @@ func TestTrajectoryRunner_TickEmitsOrientationPaths(t *testing.T) {
 	}
 }
 
-func TestTrajectoryRunner_OrientationPointsAlongSegment(t *testing.T) {
+func TestTrajectoryRunner_OrientationLerpsFromWaypoints(t *testing.T) {
 	scene := visuals.NewScene("world")
 	tr := TrajectoryRunner{}
 	tr.Initial(scene)
-	tr.Tick(scene, 0.5)
+	tr.Tick(scene, 0.0)
 	v := scene.Get("trajectory_runner")
 	runner, ok := v.(*visuals.Sphere)
 	if !ok {
 		t.Fatalf("runner is %T", v)
 	}
-	wps := tr.waypoints()
-	dx, dy, dz := wps[1].X-wps[0].X, wps[1].Y-wps[0].Y, wps[1].Z-wps[0].Z
-	segLen := math.Sqrt(dx*dx + dy*dy + dz*dz)
-	if math.Abs(runner.Pose.OX-dx/segLen) > 1e-6 ||
-		math.Abs(runner.Pose.OY-dy/segLen) > 1e-6 ||
-		math.Abs(runner.Pose.OZ-dz/segLen) > 1e-6 {
-		t.Errorf("orientation mismatch: got (%v,%v,%v) want (%v,%v,%v)",
-			runner.Pose.OX, runner.Pose.OY, runner.Pose.OZ,
-			dx/segLen, dy/segLen, dz/segLen)
+	wp0 := tr.waypoints()[0]
+	// At t=0 the runner should exactly match wp 0's orientation.
+	if math.Abs(runner.Pose.OX-wp0.OX) > 1e-6 ||
+		math.Abs(runner.Pose.OY-wp0.OY) > 1e-6 ||
+		math.Abs(runner.Pose.OZ-wp0.OZ) > 1e-6 ||
+		math.Abs(runner.Pose.Theta-wp0.Theta) > 1e-6 {
+		t.Errorf("runner orient @ t=0 should match wp0: got (%v,%v,%v,θ=%v) want (%v,%v,%v,θ=%v)",
+			runner.Pose.OX, runner.Pose.OY, runner.Pose.OZ, runner.Pose.Theta,
+			wp0.OX, wp0.OY, wp0.OZ, wp0.Theta)
 	}
 }
 
@@ -588,7 +597,7 @@ func TestAllRecipe_RunsEverySubRecipe(t *testing.T) {
 	labels := scene.Labels()
 	expected := []string{
 		"march_0", "pulse_0", "demo_box",
-		"frame_0", "arm_shoulder", "wp_0", "trajectory_runner",
+		"frame_0", "arm_shoulder", "trajectory_wp_0", "trajectory_runner",
 	}
 	for _, want := range expected {
 		found := false
