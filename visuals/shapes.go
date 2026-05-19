@@ -142,6 +142,57 @@ func (p Point) ToItem() Item {
 	}
 }
 
+// Frame is a pure transform anchor — a reference frame other
+// Visuals can parent to without rendering anything visible itself.
+//
+// Use it to declare hierarchy: place a Frame at the position you
+// want to be the "joint" or "pivot", then give other Visuals
+// ParentFrame=<frame.Label>. Moving the Frame transports the
+// children with it; the renderer composes the parent transform
+// automatically.
+//
+// Internally a tiny sphere with Invisible=true. ShowAxesHelper
+// defaults to true so the anchor's pose is visible during
+// development. Set Invisible=false to render the sphere body too.
+//
+// Example:
+//
+//	pivot := &visuals.Frame{Label: "pivot", Pose: visuals.PoseAt(500, 0, 300, 0, 0, 1, 0)}
+//	child := &visuals.Box{
+//	    Label: "child", Pose: visuals.PoseAt(80, 0, 0, 0, 0, 1, 0),
+//	    DimsMM: visuals.BoxDims{X: 40, Y: 40, Z: 40},
+//	    ParentFrame: "pivot",
+//	}
+//	// Rotate the pivot; the child rotates with it:
+//	pivot.Pose = visuals.PoseAt(500, 0, 300, 0, 0, 1, 45)
+//	events, _ := scene.Update(pivot)
+type Frame struct {
+	Label       string
+	Pose        Pose
+	ParentFrame string
+
+	// Visible: render the underlying 1 mm sphere body. Defaults to
+	// false (anchor invisible — only the axes helper paints).
+	Visible bool
+	// HideAxes: hide the renderer's built-in axes helper. Defaults
+	// to false (axes shown). Combined with Visible=false, this
+	// produces a fully-invisible anchor — useful for sub-anchors
+	// in a deep hierarchy where you don't want a wall of triads.
+	HideAxes bool
+}
+
+// ToItem implements Visual.
+func (f Frame) ToItem() Item {
+	must(f.Label != "", "Frame requires Label")
+	return Item{
+		Type: "sphere", Label: f.Label,
+		Pose: fillPose(f.Pose), ParentFrame: f.ParentFrame,
+		RadiusMM:       1.0,
+		Invisible:      !f.Visible,
+		ShowAxesHelper: !f.HideAxes,
+	}
+}
+
 // Arrow — procedural cylinder-shaft + cone-tip mesh along the
 // entity's local +Z. LengthMM is the total tip-to-tail length;
 // RadiusMM is the shaft radius.

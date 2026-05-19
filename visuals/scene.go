@@ -181,7 +181,7 @@ func (s *Scene) Update(visuals ...interface{}) ([]SceneEvent, error) {
 		// SceneServiceBase / applyEvents translate it into a
 		// REMOVE + ADD with a fresh UUID so the renderer paints
 		// the new metadata.
-		if len(paths) == 0 && !metadataChanged(entry.committed, newItem) {
+		if len(paths) == 0 && !requiresRespawn(entry.committed, newItem) {
 			continue
 		}
 		entry.committed = newItem
@@ -380,11 +380,20 @@ func diffPaths(old, new Item) []string {
 	return paths
 }
 
-// metadataChanged reports whether any of the metadata fields the
-// renderer drops on UPDATED differ between two items. Used by
-// Scene.Update to decide whether to emit an empty-paths UPDATED
-// (the consumer-side respawn signal) for a metadata-only change.
-func metadataChanged(old, new Item) bool {
+// requiresRespawn reports whether any of the fields the renderer
+// reads only at spawn time (not on UPDATED) differ between two
+// items. Covers the metadata bag (color, opacity, show_axes_helper,
+// invisible) plus parent_frame — all of which the
+// updateEntity matcher drops, so animating any of them requires
+// REMOVE + re-ADD with a fresh UUID at the wire.
+//
+// Scene.Update emits an UPDATED with empty Paths for any of these
+// changes; SceneServiceBase.applyEvents translates that into the
+// REMOVE + re-ADD respawn.
+func requiresRespawn(old, new Item) bool {
+	if old.ParentFrame != new.ParentFrame {
+		return true
+	}
 	if old.ShowAxesHelper != new.ShowAxesHelper {
 		return true
 	}

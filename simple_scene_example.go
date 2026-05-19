@@ -94,6 +94,13 @@ type simpleScene struct {
 	// every tick. SetScene installs it in s.Scene; SceneTick mutates
 	// it; s.Scene.Update(s.movingBox) emits the diff.
 	movingBox *visuals.Box
+
+	// Hierarchical layer: a pivot Frame with two children parented
+	// to it. Rotating the pivot transports the children — they
+	// don't need their own updates.
+	pivot       *visuals.Frame
+	childSphere *visuals.Sphere
+	childBox    *visuals.Box
 }
 
 func newSimpleScene(
@@ -138,7 +145,32 @@ func (s *simpleScene) Reconfigure(
 		Opacity: &opacity,
 	}
 
+	// Hierarchical layer: pivot Frame + two children. Only the
+	// pivot's pose updates each tick; the children are parented to
+	// it and inherit the transform via the renderer's frame chain.
+	yellow := visuals.Color{R: 255, G: 255, B: 0}
+	magenta := visuals.Color{R: 255, G: 0, B: 255}
+	s.pivot = &visuals.Frame{
+		Label: "pivot",
+		Pose:  visuals.PoseAt(-700, 0, 300, 0, 0, 1, 0),
+	}
+	s.childSphere = &visuals.Sphere{
+		Label:       "pivot_child_sphere",
+		Pose:        visuals.PoseAt(80, 0, 0, 0, 0, 1, 0), // 80mm along pivot's +X
+		ParentFrame: "pivot",
+		RadiusMM:    30,
+		Color:       &yellow,
+	}
+	s.childBox = &visuals.Box{
+		Label:       "pivot_child_box",
+		Pose:        visuals.PoseAt(-80, 0, 0, 0, 0, 1, 0), // 80mm along pivot's -X
+		ParentFrame: "pivot",
+		DimsMM:      visuals.BoxDims{X: 40, Y: 40, Z: 40},
+		Color:       &magenta,
+	}
+
 	return s.SetScene(visuals.SetSceneOpts{},
+		// Three static primitives in a row.
 		&visuals.Box{
 			Label:  "demo_box",
 			Pose:   visuals.PoseAt(-400, 0, 100, 0, 0, 1, 0),
@@ -158,7 +190,13 @@ func (s *simpleScene) Reconfigure(
 			LengthMM: 200,
 			Color:    &blue,
 		},
+		// The animated box (mutated in SceneTick).
 		s.movingBox,
+		// Hierarchical group: pivot + two children. Only the pivot's
+		// pose updates each tick; the children follow.
+		s.pivot,
+		s.childSphere,
+		s.childBox,
 	)
 }
 
@@ -190,22 +228,35 @@ func (s *simpleScene) DoCommand(ctx context.Context, command map[string]any) (ma
 //   - Opacity: sinusoidal between 0.3 and 1.0, period 3 s. Same
 //     library-side translation as color.
 func (s *simpleScene) SceneTick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
-	// Position: orbit around (400, 0, 200).
+	// --- Moving box: four animations on one Visual ---------------
 	s.movingBox.Pose = visuals.PoseAt(
 		400+150*math.Cos(2*math.Pi*t/4.0),
 		0+150*math.Sin(2*math.Pi*t/4.0),
 		200, 0, 0, 1, 0,
 	)
-	// Scale: pulse symmetrically.
 	scale := 80.0 + 80.0*(1+math.Sin(2*math.Pi*t/2.0))/2.0
 	s.movingBox.DimsMM = visuals.BoxDims{X: scale, Y: scale, Z: scale}
-	// Color: cycle hue at full saturation / value.
 	c := visuals.HSVToRGB(math.Mod(t/6.0, 1.0), 1, 1)
 	s.movingBox.Color = &c
-	// Opacity: pulse between 0.3 and 1.0.
 	op := 0.3 + 0.7*(1+math.Sin(2*math.Pi*t/3.0))/2.0
 	s.movingBox.Opacity = &op
-	events, _ := scene.Update(s.movingBox)
+
+	// --- Hierarchical group: only the pivot updates --------------
+	// Rotate the pivot around its own +Z. The two children are
+	// parented to "pivot" via ParentFrame; the renderer composes
+	// the parent transform automatically.
+	s.pivot.Pose = visuals.PoseAt(
+		-700, 0, 300,
+		0, 0, 1, math.Mod(t*60, 360), // 60° per second
+	)
+
+	var events []visuals.SceneEvent
+	if e, _ := scene.Update(s.movingBox); len(e) > 0 {
+		events = append(events, e...)
+	}
+	if e, _ := scene.Update(s.pivot); len(e) > 0 {
+		events = append(events, e...)
+	}
 	return events
 }
 
