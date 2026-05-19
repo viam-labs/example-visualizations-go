@@ -90,33 +90,63 @@ func (s *sceneSprites) Reconfigure(
 		parentFrame = DefaultParentFrame
 	}
 
-	var items []visuals.Item
+	// Items config (legacy wire-format dicts) takes precedence over
+	// preset (matches Python sibling semantics). When set, install
+	// via ReconfigureWith — ComputeTick handles any declarative
+	// animation specs the items carry.
 	if len(cfg.Items) > 0 {
+		items := make([]visuals.Item, 0, len(cfg.Items))
 		for _, ic := range cfg.Items {
 			items = append(items, ic.toItem())
 		}
-	} else {
-		name := cfg.Preset
-		if name == "" {
-			name = DefaultPreset
+		if err := s.SceneServiceBase.ReconfigureWith(items, tickHz, uuidStrategy, parentFrame); err != nil {
+			return err
 		}
-		preset, ok := Presets[name]
-		if !ok {
-			return fmt.Errorf("unknown preset %q", name)
-		}
-		items = preset()
+		s.logger.Infow("reconfigure (items)",
+			"tick_hz", tickHz,
+			"uuid_strategy", uuidStrategy,
+			"parent_frame", parentFrame,
+			"items", len(items),
+		)
+		return nil
 	}
 
-	if err := s.SceneServiceBase.ReconfigureWith(items, tickHz, uuidStrategy, parentFrame); err != nil {
+	// Preset path: typed Visuals via SetScene. Animation dispatch
+	// happens via SceneTick → Animation.Apply (the SceneTicker hook
+	// in this service forwards to DefaultSceneTick).
+	name := cfg.Preset
+	if name == "" {
+		name = DefaultPreset
+	}
+	preset, ok := Presets[name]
+	if !ok {
+		return fmt.Errorf("unknown preset %q", name)
+	}
+	presetVisuals := preset()
+	if err := s.SceneServiceBase.SetScene(
+		visuals.SetSceneOpts{
+			TickHz: tickHz, UUIDStrategy: uuidStrategy, ParentFrame: parentFrame,
+		},
+		presetVisuals...,
+	); err != nil {
 		return err
 	}
-	s.logger.Infow("reconfigure",
+	s.logger.Infow("reconfigure (preset)",
 		"tick_hz", tickHz,
 		"uuid_strategy", uuidStrategy,
 		"parent_frame", parentFrame,
-		"items", len(items),
+		"preset", name,
+		"items", len(presetVisuals),
 	)
 	return nil
+}
+
+// SceneTick wires the library's default Animation.Apply dispatch
+// into this service. Subclasses that want custom per-frame logic
+// can override; the default delegates to DefaultSceneTick which
+// iterates the scene and calls each Visual's animation.Apply.
+func (s *sceneSprites) SceneTick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+	return s.SceneServiceBase.DefaultSceneTick(scene, t)
 }
 
 func (s *sceneSprites) Close(ctx context.Context) error {
@@ -210,12 +240,26 @@ func (s *sceneSprites) IsAnimated(item visuals.Item) bool {
 	return visuals.IsAnimated(item.Animation)
 }
 
+// LoadPreset is the wire-format adapter for the library's "preset"
+// DoCommand verb (which uses ReconfigureWith). The typed-Visual
+// preset path is used by Reconfigure above; this just flattens
+// Visuals to Items for the DoCommand path.
 func (s *sceneSprites) LoadPreset(name string) ([]visuals.Item, error) {
 	fn, ok := Presets[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown preset %q", name)
 	}
-	return fn(), nil
+	out := []visuals.Item{}
+	for _, v := range fn() {
+		if vis, ok := v.(visuals.Visual); ok {
+			out = append(out, vis.ToItem())
+		} else if comp, ok := v.(visuals.Composite); ok {
+			for _, cv := range comp.ToVisuals() {
+				out = append(out, cv.ToItem())
+			}
+		}
+	}
+	return out, nil
 }
 
 func (s *sceneSprites) BaseGeomForItem(item visuals.Item) visuals.BaseGeom {
