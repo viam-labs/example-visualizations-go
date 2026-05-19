@@ -107,3 +107,72 @@ func TestSwingPose_AtQuarterPeriod_IsBasePlusAmplitude(t *testing.T) {
 		t.Errorf("expected theta=75 (30 + 45) at quarter period, got %v", p.Theta)
 	}
 }
+
+// ---- PulseRange ------------------------------------------------------
+
+func TestPulseRange_AtTZero_IsMidpoint(t *testing.T) {
+	if got := PulseRange(80, 160, 2.0, 0); got != 120 {
+		t.Errorf("expected 120 at t=0, got %v", got)
+	}
+}
+
+func TestPulseRange_AtQuarterPeriod_IsHigh(t *testing.T) {
+	if got := PulseRange(80, 160, 4.0, 1.0); math.Abs(got-160) > 1e-9 {
+		t.Errorf("expected 160 at quarter period, got %v", got)
+	}
+}
+
+func TestPulseRange_AtThreeQuarterPeriod_IsLow(t *testing.T) {
+	if got := PulseRange(80, 160, 4.0, 3.0); math.Abs(got-80) > 1e-9 {
+		t.Errorf("expected 80 at three-quarter period, got %v", got)
+	}
+}
+
+// ---- TrajectoryPose --------------------------------------------------
+
+func TestTrajectoryPose_AtTZero_IsFirstWaypoint(t *testing.T) {
+	wps := []Pose{
+		PoseAt(0, 0, 0, 0, 0, 1, 0),
+		PoseAt(100, 0, 0, 0, 0, 1, 0),
+		PoseAt(200, 0, 0, 0, 0, 1, 0),
+	}
+	p := TrajectoryPose(wps, 10.0, 0, true)
+	if math.Abs(p.X) > 1e-9 {
+		t.Errorf("expected x=0, got %v", p.X)
+	}
+}
+
+func TestTrajectoryPose_AtSegmentMidpoint(t *testing.T) {
+	// 2 segments, 10 s total. At t = 2.5 (half of first 5-s segment).
+	wps := []Pose{
+		PoseAt(0, 0, 0, 0, 0, 1, 0),
+		PoseAt(100, 0, 0, 0, 0, 1, 0),
+		PoseAt(200, 0, 0, 0, 0, 1, 0),
+	}
+	p := TrajectoryPose(wps, 10.0, 2.5, true)
+	if math.Abs(p.X-50) > 1e-6 {
+		t.Errorf("expected x=50, got %v", p.X)
+	}
+}
+
+func TestTrajectoryPose_LoopSnapsBack(t *testing.T) {
+	wps := []Pose{
+		PoseAt(0, 0, 0, 0, 0, 1, 0),
+		PoseAt(100, 0, 0, 0, 0, 1, 0),
+	}
+	p := TrajectoryPose(wps, 10.0, 10.0, true)
+	if math.Abs(p.X) > 1e-6 {
+		t.Errorf("expected snap to wp0 (x=0), got %v", p.X)
+	}
+}
+
+func TestTrajectoryPose_NoLoopClamps(t *testing.T) {
+	wps := []Pose{
+		PoseAt(0, 0, 0, 0, 0, 1, 0),
+		PoseAt(100, 0, 0, 0, 0, 1, 0),
+	}
+	p := TrajectoryPose(wps, 10.0, 20.0, false)
+	if math.Abs(p.X-100) > 1e-6 {
+		t.Errorf("expected clamp to final wp (x=100), got %v", p.X)
+	}
+}

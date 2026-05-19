@@ -98,3 +98,61 @@ func SwingPose(base Pose, periodS, amplitudeDeg, t float64) Pose {
 	b.Theta = b.Theta + amplitudeDeg*math.Sin(2*math.Pi*t/periodS)
 	return b
 }
+
+// PulseRange returns a sinusoidal value swinging between lo and hi
+// with the given period. Use for scalar fields that should breathe
+// between two extremes — sphere radius, box dim, opacity, etc.
+//
+// Example — box that pulses between 80 mm and 160 mm at period 2 s:
+//
+//	scale := visuals.PulseRange(80, 160, 2.0, t)
+//	box.DimsMM = visuals.BoxDims{X: scale, Y: scale, Z: scale}
+//
+// Equivalent to base + amplitude × sin(2π t / periodS) where
+// base = (lo + hi) / 2 and amplitude = (hi - lo) / 2.
+func PulseRange(lo, hi, periodS, t float64) float64 {
+	base := (lo + hi) / 2.0
+	amplitude := (hi - lo) / 2.0
+	return base + amplitude*math.Sin(2*math.Pi*t/periodS)
+}
+
+// TrajectoryPose returns an interpolated pose along a multi-waypoint
+// trajectory. Walks waypoints over durationS seconds, lerping
+// between adjacent pairs with LerpPose (quaternion SLERP on
+// orientation). With loop=true, the trajectory restarts (snap back)
+// once t exceeds durationS; with loop=false, clamps to the final
+// waypoint.
+//
+// The waypoint list should match the shape of a planner output
+// (CBiRRT / RRT* / motion-service): each element is a Pose.
+//
+// Example — runner walking a 5-waypoint plan over 12 seconds:
+//
+//	plan := []visuals.Pose{visuals.PoseAt(...), ...}
+//	// In SceneTick:
+//	s.runner.Pose = visuals.TrajectoryPose(plan, 12.0, t, true)
+//	events, _ := scene.Update(s.runner)
+func TrajectoryPose(waypoints []Pose, durationS, t float64, loop bool) Pose {
+	n := len(waypoints)
+	if n < 2 {
+		panic(fmt.Sprintf("TrajectoryPose needs ≥ 2 waypoints; got %d", n))
+	}
+	nSegs := n - 1
+	var progress float64
+	if loop {
+		progress = math.Mod(t/durationS*float64(nSegs), float64(nSegs))
+	} else {
+		progress = t / durationS * float64(nSegs)
+		if progress < 0 {
+			progress = 0
+		} else if progress > float64(nSegs) {
+			progress = float64(nSegs)
+		}
+	}
+	segIdx := int(progress)
+	if segIdx >= nSegs {
+		segIdx = nSegs - 1
+	}
+	local := progress - float64(segIdx)
+	return LerpPose(waypoints[segIdx], waypoints[segIdx+1], local)
+}

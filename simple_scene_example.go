@@ -235,7 +235,9 @@ func (s *simpleScene) SceneTick(scene *visuals.Scene, t float64) []visuals.Scene
 		visuals.PoseAt(400, 0, 200, 0, 0, 1, 0),
 		4.0, 150.0, t, "z",
 	)
-	scale := 80.0 + 80.0*(1+math.Sin(2*math.Pi*t/2.0))/2.0
+	// Scale: pulse all three dimensions symmetrically between
+	// 80 and 160 mm — using the visuals.PulseRange helper.
+	scale := visuals.PulseRange(80, 160, 2.0, t)
 	s.movingBox.DimsMM = visuals.BoxDims{X: scale, Y: scale, Z: scale}
 	// Color / opacity trigger renderer respawns (the viewer drops
 	// metadata.* paths on UPDATED, so the library emits REMOVE +
