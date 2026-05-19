@@ -2,42 +2,47 @@
 // service. Publishes three static geometries to the Viam 3D scene
 // viewer.
 //
-// READ THIS FIRST if you're learning the visuals library. This file
-// is the canonical "I want to add geometries to the 3D scene viewer
-// and that's it" example. Total length: ~100 lines including this
-// comment block.
+// READ THIS FIRST if you're learning the visuals library. This is
+// the canonical "I just want to add a few geometries to the 3D
+// scene viewer" reference. Everything a Viam Go module author has
+// to write to ship a working WSS service is in this file — no
+// helper-method embeds from elsewhere in the library, no hidden
+// shortcuts. Each method below is one a new user would write by
+// hand.
 //
-// What it demonstrates
+// What the library gives you for free
+// -----------------------------------
+//
+// By embedding visuals.SceneServiceBase, the gRPC WorldStateStore
+// implementation (ListUUIDs / GetTransform / StreamTransformChanges),
+// the state map, the subscriber broadcast, the animation tick
+// loop, the UUID strategy, and the standard DoCommand verbs (list
+// / clear / snapshot / apply_events / etc.) all just work.
+//
+// What this file shows
 // --------------------
 //
-//  1. Wiring a service that embeds visuals.SceneServiceBase to get
-//     the world-state-store gRPC implementation, state map,
-//     subscriber fan-out, animation tick loop, UUID strategy, and
-//     the standard DoCommand verbs (list / clear / snapshot /
-//     apply_events / etc.) for free.
+//   - Registering the model in init().
+//   - The constructor (newSimpleScene), Reconfigure, Close, and
+//     DoCommand entry points the framework calls.
+//   - Building a scene from typed visuals.Box / .Sphere / .Capsule
+//     and handing it to the library.
+//   - All 7 SceneHooks methods inline: BuildGeometry, ReadAsset,
+//     ComputeTick, IsAnimated, LoadPreset, BaseGeomForItem,
+//     HandleCustomCommand. For this static, asset-free, no-preset
+//     scene most are one-line stubs — but they ARE the surface a
+//     new user has to write.
 //
-//  2. Wiring visuals.BasicSceneHooks to get defaults for the
-//     SceneHooks methods that only matter to services with
-//     animations, presets, or custom DoCommand verbs. With it
-//     embedded, this service only implements two hook methods.
+// What it does NOT show
+// ---------------------
 //
-//  3. Building a scene from typed visuals.Box / visuals.Sphere /
-//     visuals.Capsule values. visuals.ToItems(...) is the bridge to
-//     the wire-format Item list the service consumes.
+//   - Animations, presets, mesh / pointcloud assets, custom
+//     DoCommand verbs. The standalone-playground model in
+//     service.go demonstrates each of those.
 //
-// What it does NOT demonstrate
-// ----------------------------
-//
-//  - Animations (see standalone-playground for the 11 modes)
-//  - Configurable items / presets (see standalone-playground)
-//  - Meshes and point clouds (see standalone-playground)
-//  - Custom DoCommand verbs (see standalone-playground's
-//    get_entity_chunk)
-//  - The driver pattern (see playground-driver + playground-visualizer)
-//
-// Configure it as a `rdk:service:world_state_store` service with
-// model `viam:example-visualizations-go:simple-scene-example`. No
-// attributes are required — the scene is hardcoded.
+// Configure as a `rdk:service:world_state_store` service with model
+// viam:example-visualizations-go:simple-scene-example. No attributes
+// are required — the scene is hardcoded.
 package exampleviz
 
 import (
@@ -65,14 +70,14 @@ func init() {
 	)
 }
 
-// simpleScene embeds the library bases. SceneServiceBase carries
-// the WSS plumbing; BasicSceneHooks carries the default
-// implementations of the optional SceneHooks methods.
+// simpleScene embeds visuals.SceneServiceBase — the library does
+// the WSS plumbing — and implements the 7 SceneHooks methods
+// directly. resource.Named and resource.TriviallyCloseable provide
+// the boilerplate the SDK framework requires from every resource.
 type simpleScene struct {
 	resource.Named
 	resource.TriviallyCloseable
 	visuals.SceneServiceBase
-	visuals.BasicSceneHooks
 }
 
 func newSimpleScene(
@@ -83,25 +88,24 @@ func newSimpleScene(
 ) (worldstatestore.Service, error) {
 	s := &simpleScene{Named: conf.ResourceName().AsNamed()}
 
-	// Tell the embedded SceneServiceBase to call back into us for
-	// the hooks (BuildGeometry, ReadAsset, etc.). Method lookup
-	// finds the overrides on simpleScene first, the BasicSceneHooks
-	// defaults second.
+	// Tell the embedded SceneServiceBase which instance to call
+	// back into for the hooks (BuildGeometry, ComputeTick, etc).
 	s.SceneServiceBase.Hooks = s
 	s.SceneServiceBase.Logger = logger
 
-	// The framework doesn't call Reconfigure automatically on initial
-	// construction — do it explicitly.
+	// The framework does NOT call Reconfigure automatically on
+	// initial construction — call it explicitly here, otherwise
+	// the service starts with no items.
 	if err := s.Reconfigure(ctx, deps, conf); err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
-// Reconfigure builds the (hardcoded) scene and hands it to
-// SceneServiceBase. Real services would parse `conf.Attributes` here
-// to pick up tick_hz / uuid_strategy / parent_frame; we just take
-// the library defaults.
+// Reconfigure builds the (hardcoded) scene and hands it to the
+// library. Real services would parse conf.Attributes here to pick
+// up tick_hz / uuid_strategy / parent_frame; we just take the
+// library defaults.
 func (s *simpleScene) Reconfigure(
 	_ context.Context, _ resource.Dependencies, _ resource.Config,
 ) error {
@@ -130,8 +134,10 @@ func (s *simpleScene) Reconfigure(
 			Color:    &blue,
 		},
 	)
-	// Zero / empty arguments → SceneServiceBase uses its defaults
-	// (30 Hz, stable UUIDs, world parent frame).
+	// Zero / empty arguments fall back to the library defaults
+	// (30 Hz tick budget, stable UUIDs, "world" parent frame). The
+	// library installs items, broadcasts ADDED to any subscribers,
+	// and starts the tick task if any items animate (none here).
 	return s.SceneServiceBase.ReconfigureWith(items, 0, "", "")
 }
 
@@ -140,23 +146,65 @@ func (s *simpleScene) Close(ctx context.Context) error {
 }
 
 // DoCommand disambiguates SceneServiceBase.DoCommand from
-// resource.Named.DoCommand — both promoted via embedding — and
+// resource.Named.DoCommand (both promoted via embedding) and
 // forwards to the library implementation.
 func (s *simpleScene) DoCommand(ctx context.Context, command map[string]any) (map[string]any, error) {
 	return s.SceneServiceBase.DoCommand(ctx, command)
 }
 
-// ---- SceneHooks (only the two that this service needs) ----------------
+// ---- SceneHooks (all 7 — written out so a reader sees the full
+//      surface a service has to implement) ------------------------------
 
-// BuildGeometry: dispatch to the library helper that handles the
-// standard non-asset primitive types.
+// BuildGeometry: dispatch via the library helper for the standard
+// non-asset primitive types. A service using meshes or point clouds
+// would dispatch on item.Type and call ReadAsset for those.
 func (s *simpleScene) BuildGeometry(item visuals.Item, _ visuals.BaseGeom) (*commonpb.Geometry, error) {
 	return visuals.BuildBasicGeometry(item)
 }
 
-// ReadAsset: this service uses no meshes or point clouds. If the
-// library ever asks for an asset (it won't, since we don't ship any
-// mesh/pointcloud items), return a clear error so the bug is loud.
+// ReadAsset: this service uses no meshes or point clouds, so the
+// library will never call this. Return a clear error if it does.
 func (s *simpleScene) ReadAsset(path string) ([]byte, error) {
 	return nil, fmt.Errorf("simple-scene-example doesn't load assets (path=%q)", path)
+}
+
+// ComputeTick: no animation. The runner pose is the base pose; no
+// geometry overrides, no field-mask paths, no metadata overrides.
+func (s *simpleScene) ComputeTick(_ visuals.Item, basePose visuals.Pose, _ visuals.BaseGeom, _ float64) visuals.TickResult {
+	return visuals.TickResult{Pose: basePose}
+}
+
+// IsAnimated: no items animate.
+func (s *simpleScene) IsAnimated(_ visuals.Item) bool { return false }
+
+// LoadPreset: no presets.
+func (s *simpleScene) LoadPreset(name string) ([]visuals.Item, error) {
+	return nil, fmt.Errorf("simple-scene-example has no presets (got %q)", name)
+}
+
+// BaseGeomForItem: extract the shape-specific fields the library
+// needs to apply geom overrides during animation. We don't animate,
+// but the library still calls this on every item install.
+func (s *simpleScene) BaseGeomForItem(item visuals.Item) visuals.BaseGeom {
+	bg := visuals.BaseGeom{}
+	switch item.Type {
+	case "box":
+		if item.HasDims {
+			bg.Dims = item.DimsMM
+			bg.HasDims = true
+		}
+	case "sphere":
+		bg.RadiusMM = item.RadiusMM
+	case "capsule", "arrow":
+		bg.RadiusMM = item.RadiusMM
+		bg.LengthMM = item.LengthMM
+	}
+	return bg
+}
+
+// HandleCustomCommand: no custom DoCommand verbs. Return
+// (nil, false, nil) so the library falls through to its
+// debug-snapshot default.
+func (s *simpleScene) HandleCustomCommand(_ context.Context, _ map[string]any) (map[string]any, bool, error) {
+	return nil, false, nil
 }

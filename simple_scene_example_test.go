@@ -1,14 +1,14 @@
 package exampleviz
 
 import (
+	"context"
 	"testing"
 
 	"exampleviz/visuals"
 )
 
-// Smoke test for SimpleSceneExample: confirm the hardcoded scene
-// has the expected three labels and the basic-geometry dispatch
-// works for each.
+// Smoke test: BuildGeometry returns a non-nil geometry for each
+// primitive type in the hardcoded scene.
 func TestSimpleSceneExample_BuildGeometryForEachPrimitive(t *testing.T) {
 	tests := []struct {
 		name string
@@ -44,6 +44,9 @@ func TestSimpleSceneExample_BuildGeometryForEachPrimitive(t *testing.T) {
 	}
 }
 
+// The remaining hooks are all trivial — verify each returns the
+// expected default for a static, asset-free, no-preset scene.
+
 func TestSimpleSceneExample_ReadAssetReturnsError(t *testing.T) {
 	s := &simpleScene{}
 	if _, err := s.ReadAsset("anything"); err == nil {
@@ -51,17 +54,55 @@ func TestSimpleSceneExample_ReadAssetReturnsError(t *testing.T) {
 	}
 }
 
-// Confirm the BasicSceneHooks defaults pass through transparently:
-// no animation, no presets, no custom commands.
-func TestSimpleSceneExample_DefaultsFromBasicHooks(t *testing.T) {
+func TestSimpleSceneExample_ComputeTickReturnsBasePose(t *testing.T) {
+	s := &simpleScene{}
+	base := visuals.PoseAt(10, 20, 30, 0, 0, 1, 45)
+	result := s.ComputeTick(visuals.Item{}, base, visuals.BaseGeom{}, 0.5)
+	if result.Pose != base {
+		t.Errorf("ComputeTick should return base pose unchanged, got %+v", result.Pose)
+	}
+}
+
+func TestSimpleSceneExample_IsAnimatedAlwaysFalse(t *testing.T) {
 	s := &simpleScene{}
 	if s.IsAnimated(visuals.Item{}) {
-		t.Error("IsAnimated should return false by default")
+		t.Error("IsAnimated should always return false")
 	}
+}
+
+func TestSimpleSceneExample_LoadPresetAlwaysErrors(t *testing.T) {
+	s := &simpleScene{}
 	if _, err := s.LoadPreset("anything"); err == nil {
-		t.Error("LoadPreset should return an error by default")
+		t.Error("LoadPreset should return an error (no presets)")
 	}
-	if _, handled, err := s.HandleCustomCommand(nil, nil); handled || err != nil {
-		t.Errorf("HandleCustomCommand default should be (nil, false, nil), got handled=%v err=%v", handled, err)
+}
+
+func TestSimpleSceneExample_HandleCustomCommandFallsThrough(t *testing.T) {
+	s := &simpleScene{}
+	resp, handled, err := s.HandleCustomCommand(context.Background(), map[string]any{"command": "x"})
+	if resp != nil || handled || err != nil {
+		t.Errorf("HandleCustomCommand default should be (nil, false, nil), got (%v, %v, %v)",
+			resp, handled, err)
+	}
+}
+
+func TestSimpleSceneExample_BaseGeomForItemExtractsShapeFields(t *testing.T) {
+	s := &simpleScene{}
+	box := visuals.Box{
+		Label:  "b",
+		DimsMM: visuals.BoxDims{X: 1, Y: 2, Z: 3},
+	}.ToItem()
+	bg := s.BaseGeomForItem(box)
+	if !bg.HasDims || bg.Dims.X != 1 || bg.Dims.Y != 2 || bg.Dims.Z != 3 {
+		t.Errorf("BaseGeomForItem(box) should populate Dims, got %+v", bg)
+	}
+	sphere := visuals.Sphere{Label: "s", RadiusMM: 42}.ToItem()
+	if got := s.BaseGeomForItem(sphere).RadiusMM; got != 42 {
+		t.Errorf("BaseGeomForItem(sphere).RadiusMM = %v, want 42", got)
+	}
+	capsule := visuals.Capsule{Label: "c", RadiusMM: 5, LengthMM: 50}.ToItem()
+	bg = s.BaseGeomForItem(capsule)
+	if bg.RadiusMM != 5 || bg.LengthMM != 50 {
+		t.Errorf("BaseGeomForItem(capsule) = %+v, want RadiusMM=5 LengthMM=50", bg)
 	}
 }
