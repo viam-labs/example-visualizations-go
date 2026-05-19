@@ -68,13 +68,18 @@ type SceneHooks interface {
 	// relative paths against their installed module directory.
 	ReadAsset(path string) ([]byte, error)
 
-	// ComputeTick is the per-tick animation evaluator. Returns the
-	// new pose + geom overrides, the field-mask paths the viewer
-	// needs in the UPDATED event, and optional metadata overrides
-	// (color/opacity/in_scene).
+	// ComputeTick is the legacy per-item animation evaluator.
+	//
+	// Deprecated: implement SceneTicker.SceneTick(scene, t) instead.
+	// The new API mutates typed Visual objects via the Scene API and
+	// returns the diff events from scene.Update, avoiding the
+	// tuple-return shape and field-mask-path bookkeeping here.
 	ComputeTick(item Item, basePose Pose, baseGeom BaseGeom, t float64) TickResult
 
-	// IsAnimated returns true iff this item's animation should tick.
+	// IsAnimated returns true iff this item's animation should tick
+	// under the legacy ComputeTick path. Not consulted under the
+	// new SceneTicker path — that path runs every tick and emits no
+	// events if SceneTick returns nothing.
 	IsAnimated(item Item) bool
 
 	// LoadPreset fetches a named preset's item list. Modules with
@@ -89,6 +94,32 @@ type SceneHooks interface {
 	// is not handled — the base falls through to its default
 	// debug-snapshot reply.
 	HandleCustomCommand(ctx context.Context, command map[string]any) (response map[string]any, handled bool, err error)
+}
+
+// SceneTicker is an optional extension hook a module can implement
+// alongside SceneHooks to use the Scene-centric per-frame animation
+// API instead of the legacy SceneHooks.ComputeTick path.
+//
+// When the Hooks instance satisfies this interface, the tick loop
+// calls SceneTick(scene, t) every 1/tick_hz seconds. The subclass
+// mutates typed Visual / Composite objects in the scene and returns
+// the diff events produced by scene.Update(...). The library
+// broadcasts the events to subscribers and handles renderer quirks
+// (notably: empty-Paths UPDATED events produced by metadata-only
+// changes are translated to REMOVE + re-ADD with a fresh UUID so
+// the renderer actually paints color / opacity changes).
+//
+// Example:
+//
+//	func (s *myService) SceneTick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+//	    s.myBox.Pose = visuals.PoseAt(100*math.Cos(t), 100*math.Sin(t), 100, 0, 0, 1, 0)
+//	    c := visuals.HSVToRGB(math.Mod(t/6, 1), 1, 1)
+//	    s.myBox.Color = &c
+//	    events, _ := scene.Update(s.myBox)
+//	    return events
+//	}
+type SceneTicker interface {
+	SceneTick(scene *Scene, t float64) []SceneEvent
 }
 
 // ItemState is the per-item runtime state.
@@ -127,6 +158,15 @@ type SceneServiceBase struct {
 	DefaultPreset          string
 	DefaultChunkSizePoints int
 	MaxTickHz              float64
+
+	// Scene-centric API: a typed object-graph that backs the service
+	// state. Subclasses install Visuals via SetScene(...) and mutate
+	// them in their SceneTick hook (see SceneHooks). The library
+	// handles diff'ing, field-mask path emission, and renderer-quirk
+	// workarounds (metadata-only → REMOVE+ADD respawn) internally.
+	//
+	// Allocated lazily in ReconfigureWith / SetScene.
+	Scene *Scene
 
 	mu          sync.Mutex
 	state       map[string]*ItemState
@@ -218,20 +258,73 @@ func (s *SceneServiceBase) ReconfigureWith(
 		})
 	}
 
-	animated := false
-	for _, st := range s.state {
-		if s.Hooks.IsAnimated(st.Item) {
-			animated = true
-			break
+	// Start the tick goroutine if the Hooks implements SceneTicker
+	// (new API) OR any item has a declarative animation spec (legacy
+	// ComputeTick path).
+	_, hasSceneTicker := s.Hooks.(SceneTicker)
+	wantsTick := hasSceneTicker
+	if !wantsTick {
+		for _, st := range s.state {
+			if s.Hooks.IsAnimated(st.Item) {
+				wantsTick = true
+				break
+			}
 		}
 	}
-	if animated {
+	if wantsTick {
 		s.tickStop = make(chan struct{})
 		s.tickDone = make(chan struct{})
 		s.animT0 = time.Now()
 		go s.tickLoop(s.tickStop, s.tickDone)
 	}
 	return nil
+}
+
+// SetScene installs typed Visual / Composite objects as the new
+// scene state. Composites expand to their constituent Visuals; each
+// is tracked in s.Scene so subclasses can keep references and mutate
+// them on each SceneTick.
+//
+// Broadcasts REMOVED for any prior state and ADDED for the new
+// state, then restarts the tick task if this service uses animation
+// (either the new SceneTicker hook or the legacy ComputeTick path).
+//
+// Example:
+//
+//	func (s *myService) Reconfigure(ctx, deps, conf) error {
+//	    s.myBox = &visuals.Box{Label: "demo", Pose: ..., DimsMM: ..., Color: ...}
+//	    return s.SetScene(visuals.SetSceneOpts{
+//	        TickHz: 30, UUIDStrategy: "stable", ParentFrame: "world",
+//	    }, s.myBox)
+//	}
+//
+// For services that build wire-format Items directly (no typed
+// objects), use ReconfigureWith instead.
+func (s *SceneServiceBase) SetScene(opts SetSceneOpts, visuals ...interface{}) error {
+	parent := opts.ParentFrame
+	if parent == "" {
+		parent = s.defaultParentFrameOr()
+	}
+	// Build a fresh Scene so subscribers' initial-burst sees the
+	// post-mutation snapshot.
+	s.Scene = NewScene(parent)
+	addEvents, err := s.Scene.Add(visuals...)
+	if err != nil {
+		return err
+	}
+	items := make([]Item, 0, len(addEvents))
+	for _, e := range addEvents {
+		items = append(items, e.Item)
+	}
+	return s.ReconfigureWith(items, opts.TickHz, opts.UUIDStrategy, parent)
+}
+
+// SetSceneOpts is the tick/UUID/parent-frame config for SetScene.
+// Zero values fall back to the SceneServiceBase defaults.
+type SetSceneOpts struct {
+	TickHz       float64
+	UUIDStrategy string
+	ParentFrame  string
 }
 
 // Close shuts down the tick goroutine and closes all subscriber
@@ -488,6 +581,27 @@ func (s *SceneServiceBase) tickLoop(stop <-chan struct{}, done chan<- struct{}) 
 
 func (s *SceneServiceBase) tickOnce() error {
 	t := time.Since(s.animT0).Seconds()
+
+	// Scene-centric tick path: if the Hooks instance also implements
+	// SceneTicker, call SceneTick(scene, t) and apply the returned
+	// events through the same machinery applyEvents uses. The
+	// subclass gets the typed Scene API; the library handles wire
+	// format, subscriber broadcasts, and the metadata-only-respawn
+	// intercept.
+	if st, ok := s.Hooks.(SceneTicker); ok && s.Scene != nil {
+		events := st.SceneTick(s.Scene, t)
+		if len(events) > 0 {
+			cmd := map[string]any{
+				"command": "apply_events",
+				"events":  EventsToWire(events),
+			}
+			if _, err := s.applyEvents(cmd); err != nil && s.Logger != nil {
+				s.Logger.Warnw("SceneTick apply failed", "err", err)
+			}
+		}
+		return nil
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, st := range s.state {
@@ -868,11 +982,49 @@ func (s *SceneServiceBase) applyEvents(command map[string]any) (map[string]any, 
 			// or []any (cross-process gRPC where structpb erases the
 			// concrete element type). Handle both.
 			paths := coerceStringSlice(evt["paths"])
-			st.Item = newItem
 			basePose := newItem.Pose
 			if basePose.OX == 0 && basePose.OY == 0 && basePose.OZ == 0 {
 				basePose.OZ = 1.0
 			}
+
+			if len(paths) == 0 {
+				// Empty paths means a metadata-only change (color /
+				// opacity / show_axes_helper / invisible). The
+				// renderer's UPDATED handler drops metadata.* paths,
+				// so a plain UPDATED would be a no-op at the viewer.
+				// Respawn: REMOVE the entity with its current UUID,
+				// then ADD it back with a fresh UUID so the renderer
+				// re-reads metadata at spawn.
+				oldTF := st.Transform
+				s.broadcastLocked(worldstatestore.TransformChange{
+					ChangeType: wsspb.TransformChangeType_TRANSFORM_CHANGE_TYPE_REMOVED,
+					Transform:  oldTF,
+				})
+				newUUID := VersionedUUID(label)
+				st.Item = newItem
+				st.BasePose = basePose
+				st.BaseGeom = s.Hooks.BaseGeomForItem(newItem)
+				geom, err := s.Hooks.BuildGeometry(newItem, st.BaseGeom)
+				if err != nil {
+					errors = append(errors, fmt.Sprintf("event[%d] (%q): build geom: %v", i, rawLabel, err))
+					continue
+				}
+				newTF, err := s.buildTransform(newItem, basePose, geom, newUUID, nil)
+				if err != nil {
+					errors = append(errors, fmt.Sprintf("event[%d] (%q): build transform: %v", i, rawLabel, err))
+					continue
+				}
+				st.UUID = newUUID
+				st.Transform = newTF
+				s.broadcastLocked(worldstatestore.TransformChange{
+					ChangeType: wsspb.TransformChangeType_TRANSFORM_CHANGE_TYPE_ADDED,
+					Transform:  newTF,
+				})
+				updated++
+				continue
+			}
+
+			st.Item = newItem
 			st.BasePose = basePose
 			st.BaseGeom = s.Hooks.BaseGeomForItem(newItem)
 			geom, err := s.Hooks.BuildGeometry(newItem, st.BaseGeom)

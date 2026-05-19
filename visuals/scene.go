@@ -175,7 +175,13 @@ func (s *Scene) Update(visuals ...interface{}) ([]SceneEvent, error) {
 		newItem := v.ToItem()
 		entry := s.state[newItem.Label]
 		paths := diffPaths(entry.committed, newItem)
-		if len(paths) == 0 {
+		// Emit UPDATED if either renderer-honored paths changed OR
+		// only metadata fields changed (empty Paths). The
+		// empty-Paths case is the consumer-side respawn signal —
+		// SceneServiceBase / applyEvents translate it into a
+		// REMOVE + ADD with a fresh UUID so the renderer paints
+		// the new metadata.
+		if len(paths) == 0 && !metadataChanged(entry.committed, newItem) {
 			continue
 		}
 		entry.committed = newItem
@@ -316,46 +322,46 @@ func diffPaths(old, new Item) []string {
 	// (precession, "face the next waypoint") still emit at least
 	// one path and propagate to the renderer.
 	if old.Pose.X != new.Pose.X {
-		paths = append(paths, "poseInObserverFrame.pose.x")
+		paths = append(paths, PathX)
 	}
 	if old.Pose.Y != new.Pose.Y {
-		paths = append(paths, "poseInObserverFrame.pose.y")
+		paths = append(paths, PathY)
 	}
 	if old.Pose.Z != new.Pose.Z {
-		paths = append(paths, "poseInObserverFrame.pose.z")
+		paths = append(paths, PathZ)
 	}
 	if old.Pose.OX != new.Pose.OX {
-		paths = append(paths, "poseInObserverFrame.pose.oX")
+		paths = append(paths, PathOX)
 	}
 	if old.Pose.OY != new.Pose.OY {
-		paths = append(paths, "poseInObserverFrame.pose.oY")
+		paths = append(paths, PathOY)
 	}
 	if old.Pose.OZ != new.Pose.OZ {
-		paths = append(paths, "poseInObserverFrame.pose.oZ")
+		paths = append(paths, PathOZ)
 	}
 	if old.Pose.Theta != new.Pose.Theta {
-		paths = append(paths, "poseInObserverFrame.pose.theta")
+		paths = append(paths, PathTheta)
 	}
 
 	// Geometry scalars the renderer rebuilds via physicalObject.*.
 	if old.RadiusMM != new.RadiusMM {
-		paths = append(paths, "physicalObject.geometryType.value.radiusMm")
+		paths = append(paths, PathSphereRadius)
 	}
 	if old.LengthMM != new.LengthMM {
-		paths = append(paths, "physicalObject.geometryType.value.lengthMm")
+		paths = append(paths, PathCapsuleLength)
 	}
 
 	// Box dims_mm: per-axis diff. The renderer reads the full Box
 	// geometry on any physicalObject* path.
 	if old.HasDims || new.HasDims {
 		if old.DimsMM.X != new.DimsMM.X {
-			paths = append(paths, "physicalObject.geometryType.value.dimsMm.x")
+			paths = append(paths, PathBoxDimsX)
 		}
 		if old.DimsMM.Y != new.DimsMM.Y {
-			paths = append(paths, "physicalObject.geometryType.value.dimsMm.y")
+			paths = append(paths, PathBoxDimsY)
 		}
 		if old.DimsMM.Z != new.DimsMM.Z {
-			paths = append(paths, "physicalObject.geometryType.value.dimsMm.z")
+			paths = append(paths, PathBoxDimsZ)
 		}
 	}
 
@@ -365,11 +371,45 @@ func diffPaths(old, new Item) []string {
 		paths = append(paths, "physicalObject.mesh")
 	}
 
-	// NOTE: pointcloud_path changes do not get an UPDATED path —
-	// the renderer's updateEntity has no "pointcloud" case. Re-
-	// spawn the entity (REMOVE + ADD with a fresh label) to update
-	// a pcd. Color/opacity/show_axes_helper/invisible changes
-	// likewise omitted — see file header.
+	// NOTE: color / opacity / show_axes_helper / invisible changes
+	// produce no path here — the renderer drops metadata.* on
+	// UPDATED. Scene.Update detects these via metadataChanged()
+	// and emits an UPDATED with empty Paths as a signal to
+	// SceneServiceBase / apply_events to respawn with a fresh UUID.
 
 	return paths
+}
+
+// metadataChanged reports whether any of the metadata fields the
+// renderer drops on UPDATED differ between two items. Used by
+// Scene.Update to decide whether to emit an empty-paths UPDATED
+// (the consumer-side respawn signal) for a metadata-only change.
+func metadataChanged(old, new Item) bool {
+	if old.ShowAxesHelper != new.ShowAxesHelper {
+		return true
+	}
+	if old.Invisible != new.Invisible {
+		return true
+	}
+	if !colorEqual(old.Color, new.Color) {
+		return true
+	}
+	if !float64PtrEqual(old.Opacity, new.Opacity) {
+		return true
+	}
+	return false
+}
+
+func colorEqual(a, b *Color) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
+func float64PtrEqual(a, b *float64) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }

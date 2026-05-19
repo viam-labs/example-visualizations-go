@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"go.viam.com/rdk/resource"
+
 	"exampleviz/visuals"
 )
 
@@ -83,6 +85,57 @@ func TestSimpleSceneExample_HandleCustomCommandFallsThrough(t *testing.T) {
 	if resp != nil || handled || err != nil {
 		t.Errorf("HandleCustomCommand default should be (nil, false, nil), got (%v, %v, %v)",
 			resp, handled, err)
+	}
+}
+
+// ---- SceneTick (the new per-frame animation API) ---------------------
+
+// bareScene constructs a simpleScene with hooks wired and the scene
+// populated via Reconfigure, ready for SceneTick exercise without a
+// real framework Config.
+func bareScene(t *testing.T) *simpleScene {
+	t.Helper()
+	s := &simpleScene{}
+	s.SceneServiceBase.Hooks = s
+	if err := s.Reconfigure(nil, nil, resource.Config{}); err != nil {
+		t.Fatalf("Reconfigure: %v", err)
+	}
+	return s
+}
+
+func TestSimpleSceneExample_SceneTickReturnsEventsForMovingBox(t *testing.T) {
+	s := bareScene(t)
+	events := s.SceneTick(s.Scene, 0.5)
+	if len(events) < 1 {
+		t.Fatalf("expected at least one SceneTick event, got %d", len(events))
+	}
+	if events[0].Label != "moving_box" {
+		t.Errorf("expected event for moving_box, got %q", events[0].Label)
+	}
+	if events[0].Kind != visuals.EventUpdated {
+		t.Errorf("expected EventUpdated, got %v", events[0].Kind)
+	}
+}
+
+func TestSimpleSceneExample_SceneTickEmitsPoseAndDimsPaths(t *testing.T) {
+	s := bareScene(t)
+	events := s.SceneTick(s.Scene, 0.5)
+	paths := events[0].Paths
+	hasPose := false
+	hasDims := false
+	for _, p := range paths {
+		if len(p) >= 19 && p[:19] == "poseInObserverFrame" {
+			hasPose = true
+		}
+		if len(p) >= 14 && p[:14] == "physicalObject" {
+			hasDims = true
+		}
+	}
+	if !hasPose {
+		t.Errorf("expected at least one pose path; got %v", paths)
+	}
+	if !hasDims {
+		t.Errorf("expected at least one physicalObject path; got %v", paths)
 	}
 }
 

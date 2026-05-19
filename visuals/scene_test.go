@@ -115,12 +115,14 @@ func TestScene_Update_PoseEmitsPerAxisPaths(t *testing.T) {
 	}
 }
 
-func TestScene_Update_MetadataOnlyChangeYieldsNoEvent(t *testing.T) {
-	// Color / opacity changes don't propagate to the renderer via
-	// UPDATED events (the renderer's updateEntity matcher ignores
-	// metadata.* prefixes). Scene.Update reflects that by emitting
-	// no event when only metadata fields changed — sending a
-	// useless wire event would be misleading.
+func TestScene_Update_MetadataOnlyChangeYieldsEmptyPathsEvent(t *testing.T) {
+	// Color / opacity changes emit an UPDATED event with empty
+	// Paths — the signal to consumers (SceneServiceBase /
+	// applyEvents) that a renderer respawn (REMOVE + re-ADD with a
+	// fresh UUID) is required. The renderer's UPDATED handler
+	// drops metadata.* paths, so a plain UPDATED would be a no-op
+	// at the viewer; the empty-Paths signal lets the consumer
+	// rewrite the event into REMOVE + ADD on the wire.
 	s := NewScene("world")
 	b := &Box{
 		Label:   "b",
@@ -137,8 +139,17 @@ func TestScene_Update_MetadataOnlyChangeYieldsNoEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(events) != 0 {
-		t.Errorf("metadata-only change should produce no event, got %v", events)
+	if len(events) != 1 {
+		t.Fatalf("expected one event, got %d: %v", len(events), events)
+	}
+	if events[0].Kind != EventUpdated {
+		t.Errorf("expected EventUpdated, got %v", events[0].Kind)
+	}
+	if events[0].Label != "b" {
+		t.Errorf("expected label \"b\", got %q", events[0].Label)
+	}
+	if len(events[0].Paths) != 0 {
+		t.Errorf("expected empty Paths (respawn signal), got %v", events[0].Paths)
 	}
 }
 
