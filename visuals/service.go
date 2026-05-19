@@ -175,6 +175,13 @@ type SceneServiceBase struct {
 	tickDone    chan struct{}
 	animT0      time.Time
 
+	// baseVisuals: per-label snapshots of each Visual at SetScene
+	// time. The default tick dispatch passes the snapshot as the
+	// "rest state" when calling animation.Apply, so Apply math
+	// reads from a stable base rather than the in-progress
+	// mutation.
+	baseVisuals map[string]Visual
+
 	tickHz       float64
 	uuidStrategy string
 	parentFrame  string
@@ -312,11 +319,84 @@ func (s *SceneServiceBase) SetScene(opts SetSceneOpts, visuals ...interface{}) e
 	if err != nil {
 		return err
 	}
+	// Snapshot each Visual's rest state for animation Apply calls.
+	s.baseVisuals = map[string]Visual{}
+	for _, label := range s.Scene.Labels() {
+		if v := s.Scene.Get(label); v != nil {
+			s.baseVisuals[label] = snapshotVisual(v)
+		}
+	}
 	items := make([]Item, 0, len(addEvents))
 	for _, e := range addEvents {
 		items = append(items, e.Item)
 	}
 	return s.ReconfigureWith(items, opts.TickHz, opts.UUIDStrategy, parent)
+}
+
+// DefaultSceneTick is the library's default per-frame animation
+// dispatcher. It iterates s.Scene, looks at each Visual's Animation
+// field (via the concrete shape pointer's type), and — when the
+// concrete animation spec implements Applicable — calls
+// spec.Apply(visual, base, t) followed by scene.Update(visual).
+// Returns the diff events from all the updates.
+//
+// Services that embed SceneServiceBase and want this behavior can
+// implement SceneTicker by delegating:
+//
+//	func (s *myService) SceneTick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
+//	    return s.DefaultSceneTick(scene, t)
+//	}
+//
+// (Go's value semantics don't support "default method" on an
+// interface — embedding doesn't automatically satisfy SceneTicker
+// unless the subclass exposes the method.)
+func (s *SceneServiceBase) DefaultSceneTick(scene *Scene, t float64) []SceneEvent {
+	var events []SceneEvent
+	for _, label := range scene.Labels() {
+		v := scene.Get(label)
+		if v == nil {
+			continue
+		}
+		spec := animSpecFor(v)
+		if spec == nil {
+			continue
+		}
+		app, ok := spec.(Applicable)
+		if !ok {
+			continue
+		}
+		base := s.baseVisuals[label]
+		if base == nil {
+			continue
+		}
+		app.Apply(v, base, t)
+		if upd, err := scene.Update(v); err == nil && len(upd) > 0 {
+			events = append(events, upd...)
+		}
+	}
+	return events
+}
+
+// animSpecFor returns the AnimationSpec field on a concrete shape
+// pointer, or nil if the shape has no animation set.
+func animSpecFor(v Visual) AnimationSpec {
+	switch x := v.(type) {
+	case *Box:
+		return x.Animation
+	case *Sphere:
+		return x.Animation
+	case *Capsule:
+		return x.Animation
+	case *Point:
+		return x.Animation
+	case *Arrow:
+		return x.Animation
+	case *Mesh:
+		return x.Animation
+	case *PointCloud:
+		return x.Animation
+	}
+	return nil
 }
 
 // SetSceneOpts is the tick/UUID/parent-frame config for SetScene.
