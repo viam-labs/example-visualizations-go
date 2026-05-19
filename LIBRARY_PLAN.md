@@ -1,11 +1,13 @@
 # ViamVizHelpers — Go library plan
 
-A Go library that extracts the reusable scaffolding from this module so a Viam world-state-store author writes the scene they want, not the wire format underneath it. Designed as the upstream-bound complement to `viamrobotics/visualization`; starts at `viam-labs/viam-viz-helpers` so iteration doesn't churn upstream packages while we settle the API.
+> **Status: extracted.** As of 0.0.44 the library lives in [`viam-labs/viam-viz-helpers-go`](https://github.com/viam-labs/viam-viz-helpers-go) and this module depends on it via `go.mod`. The original-plan name `vizhelpers` and subpackage layout (`/wsstore`) were superseded during extraction; the actual package is named `visuals` and lives at the repo root for import path simplicity. This file is kept as historical context for the design decisions.
+
+A Go library that extracts the reusable scaffolding from this module so a Viam world-state-store author writes the scene they want, not the wire format underneath it. Designed as the upstream-bound complement to `viamrobotics/visualization`; starts at `viam-labs/viam-viz-helpers-go` so iteration doesn't churn upstream packages while we settle the API.
 
 - **Project name:** ViamVizHelpers
-- **Repo:** `github.com/viam-labs/viam-viz-helpers`
-- **Imported package name:** `vizhelpers` (callers type `vizhelpers.Box(...)`)
-- **WSStore service subpackage:** `github.com/viam-labs/viam-viz-helpers/wsstore`
+- **Repo:** `github.com/viam-labs/viam-viz-helpers-go`
+- **Imported package name:** `visuals` (callers type `visuals.Box(...)`)
+- **Module path:** `github.com/viam-labs/viam-viz-helpers-go` (package `visuals` at root)
 
 ## Why now (and not earlier)
 

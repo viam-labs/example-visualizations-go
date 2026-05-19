@@ -12,6 +12,7 @@ A Viam module that ships **three models** demonstrating different patterns for d
 
 - **GitHub:** `viam-labs/example-visualizations-go`
 - **Registry:** `viam:example-visualizations-go`
+- **Library:** [`viam-labs/viam-viz-helpers-go`](https://github.com/viam-labs/viam-viz-helpers-go) — the typed visualization library. **As of 0.0.44 the library lives in its own repo**; this module depends on it via `go.mod` and imports `github.com/viam-labs/viam-viz-helpers-go` (package `visuals`).
 - **Sibling:** [`viam-labs/example-visualizations-python`](https://github.com/viam-labs/example-visualizations-python) — the Python original, primary playground for finding renderer-side gotchas. Read its `LESSONS.md` before debugging anything wire-format-shaped.
 
 ## File layout
@@ -25,30 +26,25 @@ geometries.go           # Proto builders: build_box/sphere/capsule/point/arrow/m
 animation.go            # 11 modes: none, orbit, oscillate, spin, swing, pulse, trajectory, force_vector, breathe, flicker, lifecycle. ComputeTick returns TickResult{Pose, Geom, Paths, Overrides}. camelCase field-mask path constants.
 config.go               # Config + ItemConfig (JSON-parsed) + Item (runtime). Validate() runs schema checks.
 presets.go              # 9 presets used by standalone-playground.
-cmd/module/main.go      # module.ModularMain entrypoint — registers all three models.
-
-visuals/                # The typed visualization library (planned ViamVizHelpers Go).
-visuals/pose.go         # Pose struct + Pose helpers + fillPose.
-visuals/color.go        # Color + BoxDims types.
-visuals/shapes.go       # Visual interface + Box/Sphere/Capsule/Point/Arrow/Mesh/PointCloud structs + ToItem method.
-visuals/animations.go   # AnimationSpec interface + concrete specs + Animation runtime struct + Path* field-mask constants.
-visuals/composites.go   # Composite interface + CoordinateFrame/Line/BoundingBox + ArrowFromTo.
-visuals/scene.go        # Scene + SceneEvent + diff logic.
-visuals/wire.go         # ItemFromMap (wire-format dict → Item) + EventsToWire (SceneEvent → wire). Mirrors viam_visuals.events_to_wire.
-visuals/service.go      # SceneServiceBase — inheritable WSS service. Owns state, subscribers, tick loop, DoCommand dispatch including applyEvents.
-visuals/registry.go     # In-process resource registry (Register/Lookup/Unregister/RegisteredNames).
-visuals/uuid_strategy.go      # InitialUUID / VersionedUUID / ValidStrategies.
-visuals/item.go               # The denormalized Item value type (the wire-format struct).
-visuals/mesh_io.go            # STL→PLY conversion + PLY vertex-color extraction.
-visuals/pcd_io.go             # PCD parser + chunked-delivery splitter.
-visuals/metadata.go           # Metadata struct builder (the visualization library schema).
-visuals/internal/             # Pure-data constants used by mesh / pcd helpers.
+simple_scene_example.go # Minimal teaching model — just SceneTick + ~3 primitives. Uses library defaults for everything else.
+cmd/module/main.go      # module.ModularMain entrypoint — registers all four models.
 
 assets/                 # Shipped reference geometry — copied from the Python repo verbatim.
-meta.json               # Module metadata. Lists all three models.
+meta.json               # Module metadata. Lists all four models.
 VERSION                 # Single-line semver. Bump before `make upload` — registry rejects duplicates.
-Makefile                # `make test`, `make`, `make module.tar.gz`, `make upload`. The binary target depends on Makefile, go.mod, *.go, cmd/module/*.go, visuals/*.go — if you add a new package directory, audit this list.
+Makefile                # `make test`, `make`, `make module.tar.gz`, `make upload`. Binary target deps: Makefile, go.mod, go.sum, *.go, cmd/module/*.go.
 *_test.go               # Go tests, run via `go test ./...` or `make test`.
+```
+
+The library lives in [`viam-labs/viam-viz-helpers-go`](https://github.com/viam-labs/viam-viz-helpers-go) and is consumed via `go.mod`. To iterate on the library against this module locally, drop a `go.work` at the repo root pointing to a sibling checkout:
+
+```
+go 1.25.1
+
+use (
+    .
+    ../viam-viz-helpers-go
+)
 ```
 
 ## Architecture
@@ -152,12 +148,12 @@ Every load-bearing finding from the Python module's `LESSONS.md` applies. The Go
 - **The viewer renders only PLY meshes.** STL is converted on the wire via `stlToPLY`.
 - **PCD header must match `pointcloud.ToPCD` byte-for-byte.** Leading `#` comments or `VERSION 0.7` (vs `VERSION .7`) silently fail.
 - **Transform.metadata uses the `viamrobotics/visualization` schema.** All five required keys (`colors`, `color_format`, `opacities`, `show_axes_helper`, `invisible`) must be present.
-- **Field-mask paths MUST be camelCase, not snake_case.** The renderer ignores snake_case paths silently. See `visuals/animations.go::Path*` constants.
+- **Field-mask paths MUST be camelCase, not snake_case.** The renderer ignores snake_case paths silently. See `Path*` constants in `viam-viz-helpers-go/animations.go`.
 - **Chunked delivery for point clouds is experimental, schema unverified.** Implemented for parity with Python; viewer behavior on `metadata.chunks` and `get_entity_chunk` DoCommand isn't confirmed.
 - **Renderer caches REMOVED UUIDs.** Lifecycle / flicker / respawn-style animations rotate UUIDs on every re-add.
 - **`module.ModularMain` doesn't auto-reconfigure on initial construction.** Constructors must call `Reconfigure` explicitly. Same trap as Python's `EasyResource.new`.
-- **Go in-process DoCommand preserves concrete slice types.** When the driver calls `visualizer.DoCommand(...)` in-process, `[]string` stays `[]string` and `[]map[string]any` stays itself. Over gRPC, structpb erases both to `[]any`. The visualizer's `applyEvents` handler must accept both shapes; that's what `coerceStringSlice` / `coerceEventsSlice` in `visuals/service.go` are for. A type assertion `evt["paths"].([]any)` would silently fail in-process, drop the field-mask, and produce UPDATEDs with no `UpdatedFields` — which the renderer treats as a no-op.
-- **The Makefile binary target must list every package directory.** Originally `Makefile::$(MODULE_BINARY)` had deps `Makefile go.mod *.go cmd/module/*.go` — it missed `visuals/*.go`. Changes inside the library package didn't trigger rebuilds, so `make module.tar.gz` repeatedly shipped stale binaries under new version numbers. If you add a new package directory, audit this line.
+- **Go in-process DoCommand preserves concrete slice types.** When the driver calls `visualizer.DoCommand(...)` in-process, `[]string` stays `[]string` and `[]map[string]any` stays itself. Over gRPC, structpb erases both to `[]any`. The visualizer's `applyEvents` handler must accept both shapes; that's what `coerceStringSlice` / `coerceEventsSlice` in the library are for. A type assertion `evt["paths"].([]any)` would silently fail in-process, drop the field-mask, and produce UPDATEDs with no `UpdatedFields` — which the renderer treats as a no-op.
+- **The Makefile binary target must list every local package directory.** After library extraction the deps are `Makefile go.mod go.sum *.go cmd/module/*.go`. If you add a new in-tree package, audit this line. (The pre-extraction version of this trap shipped 0.0.13 → 0.0.14 with stale binaries because `visuals/*.go` was missing.)
 
 ## Tests
 
@@ -167,10 +163,9 @@ Every load-bearing finding from the Python module's `LESSONS.md` applies. The Go
 - Metadata struct emits all five required keys + base64-correct packing (`geometries_test.go`).
 - Geometry builders produce the expected proto shape.
 - PCD parsing + chunking is byte-aware.
-- `visuals.Scene` round-trips (`visuals/scene_test.go`): add/update/remove/clear/add_or_update + composite expansion + namespace handling.
-- `visuals.Register / Lookup` registry semantics (`visuals/registry_test.go`).
-- `applyEvents` ADDED/UPDATED/REMOVED handling + namespace prefix + per-event error capture + the regression test for the typed `[]string` paths shape (`visuals/apply_events_test.go`).
 - End-to-end driver+visualizer pipeline including the in-process registry resolution and tick-driven updates (`driver_visualizer_test.go`).
+
+Library-side tests (Scene round-trips, registry semantics, applyEvents) live in `viam-labs/viam-viz-helpers-go`.
 
 What's NOT covered yet (room to grow):
 - Asset units (the Python module's `test_assets_units.py` is the canonical reference).
@@ -188,7 +183,7 @@ What's NOT covered yet (room to grow):
 
 ## Don't
 
-- **Don't change `visuals/animations.go::Path*` to snake_case** until the viz team confirms the renderer accepts snake_case. The 0.0.32 Python version broke every animation by trying this; we reverted in 0.0.33.
+- **Don't change `viam-viz-helpers-go/animations.go::Path*` to snake_case** until the viz team confirms the renderer accepts snake_case. The 0.0.32 Python version broke every animation by trying this; we reverted in 0.0.33.
 - **Don't shadow `viamkit/viz`'s primitives.** The two have different APIs and slightly different defaults; rolling our own keeps this module independent.
 - **Don't add `viamkit` as a dependency.** Self-contained build matters here — the registry consumer should be a single binary with no surprise deps.
 - **Don't deploy without auditing the Makefile dep list** if you've added new package directories.
@@ -198,6 +193,10 @@ What's NOT covered yet (room to grow):
 
 Current pre-release version sequence (latest first):
 
+- 0.0.44 — library extracted to [`viam-labs/viam-viz-helpers-go`](https://github.com/viam-labs/viam-viz-helpers-go); module depends on it via go.mod. (0.0.43 shipped a stale binary because the Makefile dep list still referenced the now-deleted `visuals/*.go`; 0.0.44 is the fresh rebuild.)
+- 0.0.42 — `simpleScene` drops the explicit `Close` glue method by no longer embedding `resource.TriviallyCloseable`.
+- 0.0.41 — `SceneHooks` becomes `type SceneHooks = any`. `BuildGeometry` and `BaseGeomForItem` are now optional via `GeometryBuilder` and `BaseGeomProvider` interfaces with library defaults. `simpleScene` implements only `SceneTick`.
+- 0.0.40 — SceneHooks shrunk to two methods; everything else moves to optional interfaces (AssetReader, PresetLoader, CustomCommandHandler, LegacyAnimator).
 - 0.0.14 — Makefile dep list now includes `visuals/*.go`, fixing the stale-binary bug. Diagnostic counters land too (broadcasts_total, updates_total, last_broadcast).
 - 0.0.13 — diagnostic counters added to the debug snapshot (would have shipped sooner, see Makefile note).
 - 0.0.12 — apply_events paths coercion fix (handles []string in-process vs []any gRPC).
