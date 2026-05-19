@@ -37,9 +37,10 @@
 //     mutate typed Visual objects, return scene.Update(...) events.
 //     The library diffs against the committed snapshot, emits the
 //     right field-mask paths, and broadcasts to subscribers.
-//  5. The legacy SceneHooks surface — for this static, asset-free,
-//     no-preset scene most are one-line stubs, but they ARE the
-//     surface a new user has to write.
+//  5. The minimum SceneHooks surface — BuildGeometry +
+//     BaseGeomForItem. Everything else (asset loading, presets,
+//     custom DoCommand verbs, the legacy per-item animation path)
+//     is an opt-in interface the module can omit.
 //
 // What it does NOT show
 // ---------------------
@@ -57,15 +58,13 @@ package exampleviz
 
 import (
 	"context"
-	"fmt"
 	"math"
 
-	commonpb "go.viam.com/api/common/v1"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/worldstatestore"
 
-	"exampleviz/visuals"
+	"github.com/viam-labs/viam-viz-helpers-go"
 )
 
 // SimpleModel is the registered model identifier.
@@ -87,7 +86,6 @@ func init() {
 // API.
 type simpleScene struct {
 	resource.Named
-	resource.TriviallyCloseable
 	visuals.SceneServiceBase
 
 	// The moving box: a typed Box object whose fields we mutate on
@@ -200,9 +198,10 @@ func (s *simpleScene) Reconfigure(
 	)
 }
 
-func (s *simpleScene) Close(ctx context.Context) error {
-	return s.SceneServiceBase.Close(ctx)
-}
+// Close is provided by the embedded visuals.SceneServiceBase (it
+// cancels the tick goroutine and closes subscriber channels). No
+// disambiguation needed since we're not embedding a competing
+// TriviallyCloseable.
 
 // DoCommand disambiguates SceneServiceBase.DoCommand from
 // resource.Named.DoCommand (both promoted via embedding).
@@ -269,55 +268,16 @@ func (s *simpleScene) SceneTick(scene *visuals.Scene, t float64) []visuals.Scene
 	return events
 }
 
-// ---- SceneHooks (all 7 — written out so a reader sees the full
-//      surface a service has to implement) ------------------------------
-
-// BuildGeometry: dispatch via the library helper for the standard
-// non-asset primitive types.
-func (s *simpleScene) BuildGeometry(item visuals.Item, _ visuals.BaseGeom) (*commonpb.Geometry, error) {
-	return visuals.BuildBasicGeometry(item)
-}
-
-// ReadAsset: this service uses no meshes or point clouds.
-func (s *simpleScene) ReadAsset(path string) ([]byte, error) {
-	return nil, fmt.Errorf("simple-scene-example doesn't load assets (path=%q)", path)
-}
-
-// ComputeTick: legacy per-item hook. SceneTick is what runs; this
-// is required by the SceneHooks interface but never called when
-// SceneTicker is implemented.
-func (s *simpleScene) ComputeTick(_ visuals.Item, basePose visuals.Pose, _ visuals.BaseGeom, _ float64) visuals.TickResult {
-	return visuals.TickResult{Pose: basePose}
-}
-
-// IsAnimated: legacy, not consulted under the SceneTicker path.
-func (s *simpleScene) IsAnimated(_ visuals.Item) bool { return false }
-
-// LoadPreset: no presets.
-func (s *simpleScene) LoadPreset(name string) ([]visuals.Item, error) {
-	return nil, fmt.Errorf("simple-scene-example has no presets (got %q)", name)
-}
-
-// BaseGeomForItem: extract shape-specific fields for the standard
-// primitives. The library calls this on every item install.
-func (s *simpleScene) BaseGeomForItem(item visuals.Item) visuals.BaseGeom {
-	bg := visuals.BaseGeom{}
-	switch item.Type {
-	case "box":
-		if item.HasDims {
-			bg.Dims = item.DimsMM
-			bg.HasDims = true
-		}
-	case "sphere":
-		bg.RadiusMM = item.RadiusMM
-	case "capsule", "arrow":
-		bg.RadiusMM = item.RadiusMM
-		bg.LengthMM = item.LengthMM
-	}
-	return bg
-}
-
-// HandleCustomCommand: no custom DoCommand verbs.
-func (s *simpleScene) HandleCustomCommand(_ context.Context, _ map[string]any) (map[string]any, bool, error) {
-	return nil, false, nil
-}
+// No SceneHooks methods are needed: this service publishes only
+// standard primitives, so the library's built-in defaults
+// (visuals.BuildBasicGeometry + visuals.DefaultBaseGeomForItem)
+// handle every item. The only hook this service implements is
+// SceneTick above, via the optional SceneTicker interface.
+//
+// Optional interfaces this service deliberately omits:
+//   - GeometryBuilder.BuildGeometry  (only needed for custom primitive types)
+//   - BaseGeomProvider.BaseGeomForItem (same)
+//   - AssetReader.ReadAsset          (no mesh / pointcloud assets)
+//   - PresetLoader.LoadPreset        (no presets)
+//   - CustomCommandHandler.HandleCustomCommand (no custom DoCommand verbs)
+//   - LegacyAnimator.ComputeTick / IsAnimated (using SceneTick instead)

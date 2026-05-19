@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"exampleviz/visuals"
+	"github.com/viam-labs/viam-viz-helpers-go"
 	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"

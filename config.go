@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"exampleviz/visuals"
+	"github.com/viam-labs/viam-viz-helpers-go"
 )
 
 // ---- attribute names / defaults --------------------------------------

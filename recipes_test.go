@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"exampleviz/visuals"
+	"github.com/viam-labs/viam-viz-helpers-go"
 )
 
 // ---- registry ---------------------------------------------------------
@@ -203,10 +203,8 @@ func TestDetectionsOverlay_OrbitCirclesOrigin(t *testing.T) {
 	if v == nil {
 		t.Fatal("det_0 not in scene")
 	}
-	// visuals.BoundingBox (solid variant) expands into a single visuals.Box;
-	// composites return visuals.Box as a value (vs. *visuals.Box for direct
-	// driver-side usage), so the scene stores it by value here.
-	b, ok := v.(visuals.Box)
+	// visuals.BoundingBox (solid variant) expands into a single *visuals.Box.
+	b, ok := v.(*visuals.Box)
 	if !ok {
 		t.Fatalf("scene.Get returned unexpected type %T", v)
 	}

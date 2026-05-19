@@ -1,90 +1,40 @@
 package exampleviz
 
 import (
-	"context"
 	"testing"
 
 	"go.viam.com/rdk/resource"
 
-	"exampleviz/visuals"
+	"github.com/viam-labs/viam-viz-helpers-go"
 )
 
-// Smoke test: BuildGeometry returns a non-nil geometry for each
-// primitive type in the hardcoded scene.
-func TestSimpleSceneExample_BuildGeometryForEachPrimitive(t *testing.T) {
-	tests := []struct {
-		name string
-		item visuals.Item
-	}{
-		{"box", visuals.Box{
-			Label:  "demo_box",
-			DimsMM: visuals.BoxDims{X: 150, Y: 150, Z: 150},
-		}.ToItem()},
-		{"sphere", visuals.Sphere{
-			Label:    "demo_sphere",
-			RadiusMM: 90,
-		}.ToItem()},
-		{"capsule", visuals.Capsule{
-			Label:    "demo_capsule",
-			RadiusMM: 50,
-			LengthMM: 200,
-		}.ToItem()},
-	}
+// SimpleScene exercises the library's default geometry / base-geom
+// path: it implements NO SceneHooks methods. Only SceneTicker is on
+// the type; every other capability falls through to the built-in
+// defaults (visuals.BuildBasicGeometry + visuals.DefaultBaseGeomForItem).
+func TestSimpleSceneExample_OmitsOptionalInterfaces(t *testing.T) {
 	s := &simpleScene{}
-	for _, tc := range tests {
-		geom, err := s.BuildGeometry(tc.item, visuals.BaseGeom{})
-		if err != nil {
-			t.Errorf("%s: BuildGeometry returned error: %v", tc.name, err)
-			continue
-		}
-		if geom == nil {
-			t.Errorf("%s: BuildGeometry returned nil geometry", tc.name)
-		}
-		if geom.Label != tc.item.Label {
-			t.Errorf("%s: label mismatch: got %q want %q", tc.name, geom.Label, tc.item.Label)
-		}
+	var hooks visuals.SceneHooks = s
+	if _, ok := hooks.(visuals.GeometryBuilder); ok {
+		t.Error("simpleScene should NOT implement GeometryBuilder (uses library default)")
 	}
-}
-
-// The remaining hooks are all trivial — verify each returns the
-// expected default for a static, asset-free, no-preset scene.
-
-func TestSimpleSceneExample_ReadAssetReturnsError(t *testing.T) {
-	s := &simpleScene{}
-	if _, err := s.ReadAsset("anything"); err == nil {
-		t.Error("expected ReadAsset to return an error (no assets supported)")
+	if _, ok := hooks.(visuals.BaseGeomProvider); ok {
+		t.Error("simpleScene should NOT implement BaseGeomProvider (uses library default)")
 	}
-}
-
-func TestSimpleSceneExample_ComputeTickReturnsBasePose(t *testing.T) {
-	s := &simpleScene{}
-	base := visuals.PoseAt(10, 20, 30, 0, 0, 1, 45)
-	result := s.ComputeTick(visuals.Item{}, base, visuals.BaseGeom{}, 0.5)
-	if result.Pose != base {
-		t.Errorf("ComputeTick should return base pose unchanged, got %+v", result.Pose)
+	if _, ok := hooks.(visuals.AssetReader); ok {
+		t.Error("simpleScene should NOT implement AssetReader")
 	}
-}
-
-func TestSimpleSceneExample_IsAnimatedAlwaysFalse(t *testing.T) {
-	s := &simpleScene{}
-	if s.IsAnimated(visuals.Item{}) {
-		t.Error("IsAnimated should always return false")
+	if _, ok := hooks.(visuals.PresetLoader); ok {
+		t.Error("simpleScene should NOT implement PresetLoader")
 	}
-}
-
-func TestSimpleSceneExample_LoadPresetAlwaysErrors(t *testing.T) {
-	s := &simpleScene{}
-	if _, err := s.LoadPreset("anything"); err == nil {
-		t.Error("LoadPreset should return an error (no presets)")
+	if _, ok := hooks.(visuals.CustomCommandHandler); ok {
+		t.Error("simpleScene should NOT implement CustomCommandHandler")
 	}
-}
-
-func TestSimpleSceneExample_HandleCustomCommandFallsThrough(t *testing.T) {
-	s := &simpleScene{}
-	resp, handled, err := s.HandleCustomCommand(context.Background(), map[string]any{"command": "x"})
-	if resp != nil || handled || err != nil {
-		t.Errorf("HandleCustomCommand default should be (nil, false, nil), got (%v, %v, %v)",
-			resp, handled, err)
+	if _, ok := hooks.(visuals.LegacyAnimator); ok {
+		t.Error("simpleScene should NOT implement LegacyAnimator")
+	}
+	if _, ok := hooks.(visuals.SceneTicker); !ok {
+		t.Error("simpleScene should implement SceneTicker")
 	}
 }
 
@@ -144,23 +94,26 @@ func TestSimpleSceneExample_SceneTickEmitsRespawnForMovingBox(t *testing.T) {
 	}
 }
 
-func TestSimpleSceneExample_BaseGeomForItemExtractsShapeFields(t *testing.T) {
-	s := &simpleScene{}
+// SimpleScene relies on the library's DefaultBaseGeomForItem; this
+// test pins that the default still extracts the standard primitive
+// shape fields. (Lives next to simpleScene because the library
+// guarantee is what this service depends on.)
+func TestSimpleSceneExample_DefaultBaseGeomExtractsShapeFields(t *testing.T) {
 	box := visuals.Box{
 		Label:  "b",
 		DimsMM: visuals.BoxDims{X: 1, Y: 2, Z: 3},
 	}.ToItem()
-	bg := s.BaseGeomForItem(box)
+	bg := visuals.DefaultBaseGeomForItem(box)
 	if !bg.HasDims || bg.Dims.X != 1 || bg.Dims.Y != 2 || bg.Dims.Z != 3 {
-		t.Errorf("BaseGeomForItem(box) should populate Dims, got %+v", bg)
+		t.Errorf("DefaultBaseGeomForItem(box) should populate Dims, got %+v", bg)
 	}
 	sphere := visuals.Sphere{Label: "s", RadiusMM: 42}.ToItem()
-	if got := s.BaseGeomForItem(sphere).RadiusMM; got != 42 {
-		t.Errorf("BaseGeomForItem(sphere).RadiusMM = %v, want 42", got)
+	if got := visuals.DefaultBaseGeomForItem(sphere).RadiusMM; got != 42 {
+		t.Errorf("DefaultBaseGeomForItem(sphere).RadiusMM = %v, want 42", got)
 	}
 	capsule := visuals.Capsule{Label: "c", RadiusMM: 5, LengthMM: 50}.ToItem()
-	bg = s.BaseGeomForItem(capsule)
+	bg = visuals.DefaultBaseGeomForItem(capsule)
 	if bg.RadiusMM != 5 || bg.LengthMM != 50 {
-		t.Errorf("BaseGeomForItem(capsule) = %+v, want RadiusMM=5 LengthMM=50", bg)
+		t.Errorf("DefaultBaseGeomForItem(capsule) = %+v, want RadiusMM=5 LengthMM=50", bg)
 	}
 }

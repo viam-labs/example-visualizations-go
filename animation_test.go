@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"exampleviz/visuals"
+	"github.com/viam-labs/viam-viz-helpers-go"
 )
 
 const eps = 1e-6

@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"exampleviz/visuals"
+	"github.com/viam-labs/viam-viz-helpers-go"
 )
 
 // PrimitiveRowSpacingMM — X-axis spacing between primitives in the

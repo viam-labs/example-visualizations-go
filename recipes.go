@@ -15,7 +15,7 @@ import (
 	"math"
 	"strings"
 
-	"exampleviz/visuals"
+	"github.com/viam-labs/viam-viz-helpers-go"
 )
 
 // Recipe is the two-method contract every recipe satisfies.

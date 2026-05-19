@@ -4,7 +4,7 @@ MODULE_BINARY := bin/example-visualizations-go
 VERSION := $(shell cat VERSION 2>/dev/null)
 PLATFORM ?= linux/amd64
 
-$(MODULE_BINARY): Makefile go.mod *.go cmd/module/*.go visuals/*.go
+$(MODULE_BINARY): Makefile go.mod go.sum *.go cmd/module/*.go
 	$(GO_BUILD_ENV) go build $(GO_BUILD_FLAGS) -o $(MODULE_BINARY) cmd/module/main.go
 
 .PHONY: lint

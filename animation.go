@@ -15,7 +15,7 @@ package exampleviz
 import (
 	"math"
 
-	"exampleviz/visuals"
+	"github.com/viam-labs/viam-viz-helpers-go"
 )
 
 // The path constants, visuals.SupportedModes, lifecycle convention colors,

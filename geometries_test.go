@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"exampleviz/visuals"
+	"github.com/viam-labs/viam-viz-helpers-go"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 

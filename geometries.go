@@ -2,12 +2,12 @@
 //
 // Turns the item structs the service consumes into commonpb.Geometry
 // protos. This is the bridge between the library's typed scene
-// objects (produced by exampleviz/visuals) and the WorldStateStore
+// objects (produced by github.com/viam-labs/viam-viz-helpers-go) and the WorldStateStore
 // wire format.
 //
 // The pure asset I/O — PLY/STL/PCD parsers, the metadata Struct
 // builder, the procedural arrow generator — lives in
-// exampleviz/visuals. This file keeps the small set of
+// github.com/viam-labs/viam-viz-helpers-go. This file keeps the small set of
 // viam-proto-emitting builders that need to be co-located with the
 // service.
 package exampleviz
@@ -17,7 +17,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"exampleviz/visuals"
+	"github.com/viam-labs/viam-viz-helpers-go"
 	commonpb "go.viam.com/api/common/v1"
 )
 
