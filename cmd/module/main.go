@@ -12,6 +12,7 @@ import (
 func main() {
 	module.ModularMain(
 		resource.APIModel{API: worldstatestore.API, Model: exampleviz.Model},
+		resource.APIModel{API: worldstatestore.API, Model: exampleviz.SimpleModel},
 		resource.APIModel{API: worldstatestore.API, Model: exampleviz.VisualizerModel},
 		resource.APIModel{API: generic.API, Model: exampleviz.DriverModel},
 	)
