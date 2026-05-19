@@ -229,10 +229,11 @@ func (s *simpleScene) DoCommand(ctx context.Context, command map[string]any) (ma
 //     library-side translation as color.
 func (s *simpleScene) SceneTick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
 	// --- Moving box: four animations on one Visual ---------------
-	s.movingBox.Pose = visuals.PoseAt(
-		400+150*math.Cos(2*math.Pi*t/4.0),
-		0+150*math.Sin(2*math.Pi*t/4.0),
-		200, 0, 0, 1, 0,
+	// Position: orbit around (400, 0, 200) at radius 150 mm,
+	// period 4 s — using the visuals.OrbitPose helper.
+	s.movingBox.Pose = visuals.OrbitPose(
+		visuals.PoseAt(400, 0, 200, 0, 0, 1, 0),
+		4.0, 150.0, t, "z",
 	)
 	scale := 80.0 + 80.0*(1+math.Sin(2*math.Pi*t/2.0))/2.0
 	s.movingBox.DimsMM = visuals.BoxDims{X: scale, Y: scale, Z: scale}
