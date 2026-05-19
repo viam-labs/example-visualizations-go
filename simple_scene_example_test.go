@@ -117,25 +117,30 @@ func TestSimpleSceneExample_SceneTickReturnsEventsForMovingBox(t *testing.T) {
 	}
 }
 
-func TestSimpleSceneExample_SceneTickEmitsPoseAndDimsPaths(t *testing.T) {
+func TestSimpleSceneExample_SceneTickEmitsRespawnForMovingBox(t *testing.T) {
+	// Moving box mutates color + opacity every step in addition to
+	// pose + dims. Scene escalates events that touch metadata to
+	// the respawn signal (Paths=[]) — SceneServiceBase materializes
+	// the respawn as REMOVE + ADD with fresh UUID, carrying the new
+	// pose AND new metadata in one event sequence.
 	s := bareScene(t)
 	events := s.SceneTick(s.Scene, 0.5)
-	paths := events[0].Paths
-	hasPose := false
-	hasDims := false
-	for _, p := range paths {
-		if len(p) >= 19 && p[:19] == "poseInObserverFrame" {
-			hasPose = true
-		}
-		if len(p) >= 14 && p[:14] == "physicalObject" {
-			hasDims = true
+	var movingEvent *visuals.SceneEvent
+	for i := range events {
+		if events[i].Label == "moving_box" {
+			movingEvent = &events[i]
+			break
 		}
 	}
-	if !hasPose {
-		t.Errorf("expected at least one pose path; got %v", paths)
+	if movingEvent == nil {
+		t.Fatal("expected an event for moving_box")
 	}
-	if !hasDims {
-		t.Errorf("expected at least one physicalObject path; got %v", paths)
+	if movingEvent.Kind != visuals.EventUpdated {
+		t.Errorf("expected EventUpdated, got %v", movingEvent.Kind)
+	}
+	if len(movingEvent.Paths) != 0 {
+		t.Errorf("expected respawn signal (empty Paths) since color "+
+			"and opacity change; got %v", movingEvent.Paths)
 	}
 }
 

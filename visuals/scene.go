@@ -175,14 +175,22 @@ func (s *Scene) Update(visuals ...interface{}) ([]SceneEvent, error) {
 		newItem := v.ToItem()
 		entry := s.state[newItem.Label]
 		paths := diffPaths(entry.committed, newItem)
-		// Emit UPDATED if either renderer-honored paths changed OR
-		// only metadata fields changed (empty Paths). The
-		// empty-Paths case is the consumer-side respawn signal —
-		// SceneServiceBase / applyEvents translate it into a
-		// REMOVE + ADD with a fresh UUID so the renderer paints
-		// the new metadata.
-		if len(paths) == 0 && !requiresRespawn(entry.committed, newItem) {
+		respawn := requiresRespawn(entry.committed, newItem)
+		// No paths changed AND no metadata changed → no event.
+		if len(paths) == 0 && !respawn {
 			continue
+		}
+		// Respawn (empty Paths) wins over UPDATED when both kinds of
+		// change happen simultaneously. The renderer drops
+		// metadata.* / parent_frame on UPDATED, so emitting paths
+		// here would visibly lose the metadata change. The
+		// consumer-side respawn carries the new pose + new geometry
+		// + new metadata in a single REMOVE + re-ADD, losing
+		// nothing. Cost: a respawn is heavier on the wire than an
+		// UPDATED, so callers mutating metadata at high tick rates
+		// should snap to discrete steps (see visuals.SnapStep).
+		if respawn {
+			paths = nil
 		}
 		entry.committed = newItem
 		entry.visual = v

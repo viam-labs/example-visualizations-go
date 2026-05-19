@@ -236,9 +236,15 @@ func (s *simpleScene) SceneTick(scene *visuals.Scene, t float64) []visuals.Scene
 	)
 	scale := 80.0 + 80.0*(1+math.Sin(2*math.Pi*t/2.0))/2.0
 	s.movingBox.DimsMM = visuals.BoxDims{X: scale, Y: scale, Z: scale}
-	c := visuals.HSVToRGB(math.Mod(t/6.0, 1.0), 1, 1)
+	// Color / opacity trigger renderer respawns (the viewer drops
+	// metadata.* paths on UPDATED, so the library emits REMOVE +
+	// re-ADD with a fresh UUID). Snap to bounded step counts so the
+	// respawn rate doesn't pin to tick_hz; see visuals.SnapStep.
+	hue := visuals.SnapStep(math.Mod(t/6.0, 1.0), 24, 0, 1) // 24 hues / 6 s
+	c := visuals.HSVToRGB(hue, 1, 1)
 	s.movingBox.Color = &c
-	op := 0.3 + 0.7*(1+math.Sin(2*math.Pi*t/3.0))/2.0
+	opRaw := 0.3 + 0.7*(1+math.Sin(2*math.Pi*t/3.0))/2.0
+	op := visuals.SnapStep(opRaw, 12, 0.3, 1.0)
 	s.movingBox.Opacity = &op
 
 	// --- Hierarchical group: only the pivot updates --------------

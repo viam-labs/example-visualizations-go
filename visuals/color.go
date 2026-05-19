@@ -46,3 +46,41 @@ func HSVToRGB(h, s, v float64) Color {
 	}
 	return Color{R: int(r * 255), G: int(g * 255), B: int(b * 255)}
 }
+
+// SnapStep quantizes a value in [lo, hi] to one of nSteps discrete
+// values. Use when mutating renderer-respawn-triggering fields
+// (color, opacity, ParentFrame, ShowAxesHelper, Invisible) in a
+// high-rate tick loop. Scene.Update emits a respawn event once per
+// distinct snapped value, so snapping bounds the wire-level
+// REMOVE+ADD churn (and the renderer's REMOVED-UUID cache growth)
+// to nSteps events per cycle instead of one per tick.
+//
+// Example — cycle hue through 16 steps per 6-second cycle:
+//
+//	hueStep := visuals.SnapStep(math.Mod(t/6, 1), 16, 0, 1)
+//	c := visuals.HSVToRGB(hueStep, 1, 1)
+//	box.Color = &c
+//	events, _ := scene.Update(box)
+//
+// With nSteps=16 and a 6 s cycle, scene.Update emits at most 16
+// respawns per 6 s (≈ 2.7 Hz) regardless of tick rate.
+func SnapStep(value float64, nSteps int, lo, hi float64) float64 {
+	if nSteps <= 0 {
+		return lo
+	}
+	if hi <= lo {
+		return lo
+	}
+	span := hi - lo
+	u := (value - lo) / span
+	if u < 0 {
+		u = 0
+	} else if u > 1 {
+		u = 1
+	}
+	step := int(u * float64(nSteps))
+	if step >= nSteps {
+		step = nSteps - 1
+	}
+	return lo + (float64(step)/float64(nSteps))*span
+}
