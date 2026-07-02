@@ -3,7 +3,7 @@ module exampleviz
 go 1.25.1
 
 require (
-	github.com/viam-labs/viam-viz-helpers-go v0.0.0-20260519222628-6f4300101d73
+	github.com/viam-labs/viam-viz-helpers-go v0.0.0-20260702193624-494c860f85ef
 	go.viam.com/api v0.1.496
 	go.viam.com/rdk v0.105.0
 	google.golang.org/protobuf v1.36.10

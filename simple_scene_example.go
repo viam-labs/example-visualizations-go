@@ -18,12 +18,13 @@
 // the UUID strategy, and the standard DoCommand verbs (list / clear
 // / snapshot / apply_events / etc.) all just work.
 //
-// The library also hides the renderer's quirks. A subscriber sees a
-// clean stream of ADDED / UPDATED / REMOVED events that the viewer
-// honors — including for color and opacity changes, which the
-// library translates into a transparent REMOVE + re-ADD with a fresh
-// UUID under the hood (the viewer's UPDATED handler drops
-// metadata.* paths; see LESSONS.md for the full story).
+// The library emits a clean stream of ADDED / UPDATED / REMOVED
+// events that the viewer honors — including for color and opacity
+// changes, which flow through UPDATED events with metadata.* field-
+// mask paths since the viewer fix that removed the metadata-drop
+// bug. `parent_frame` mutations still require a respawn (REMOVE +
+// re-ADD with a fresh UUID) and the library handles that
+// transparently; see LESSONS.md for the pre-fix history.
 //
 // What this file shows
 // --------------------
@@ -214,18 +215,17 @@ func (s *simpleScene) DoCommand(ctx context.Context, command map[string]any) (ma
 // SceneTick is called by the library's tick loop at tick_hz (default
 // 30 Hz). Mutate typed Visual objects in place; return the diff
 // events from scene.Update(...). The library broadcasts the events
-// to subscribers and translates metadata-only updates (color,
-// opacity) into renderer-visible REMOVE + re-ADD with a fresh UUID.
+// to subscribers.
 //
 // The moving box does four animations simultaneously:
 //
 //   - Position: orbit around its anchor at radius 150 mm, period 4 s.
 //   - Scale: pulse symmetrically between 80 mm and 160 mm, period 2 s.
-//   - Color: hue cycles through the rainbow at period 6 s. Library
-//     respawns the entity on each step so the viewer actually paints
-//     the change.
-//   - Opacity: sinusoidal between 0.3 and 1.0, period 3 s. Same
-//     library-side translation as color.
+//   - Color: hue cycles through the rainbow at period 6 s. Emitted as
+//     UPDATED with metadata.colors; the viewer refreshes the trait
+//     in place.
+//   - Opacity: sinusoidal between 0.3 and 1.0, period 3 s. Emitted
+//     as UPDATED with metadata.opacities.
 func (s *simpleScene) SceneTick(scene *visuals.Scene, t float64) []visuals.SceneEvent {
 	// --- Moving box: four animations on one Visual ---------------
 	// Position: orbit around (400, 0, 200) at radius 150 mm,
@@ -238,10 +238,10 @@ func (s *simpleScene) SceneTick(scene *visuals.Scene, t float64) []visuals.Scene
 	// 80 and 160 mm — using the visuals.PulseRange helper.
 	scale := visuals.PulseRange(80, 160, 2.0, t)
 	s.movingBox.DimsMM = visuals.BoxDims{X: scale, Y: scale, Z: scale}
-	// Color / opacity trigger renderer respawns (the viewer drops
-	// metadata.* paths on UPDATED, so the library emits REMOVE +
-	// re-ADD with a fresh UUID). Snap to bounded step counts so the
-	// respawn rate doesn't pin to tick_hz; see visuals.SnapStep.
+	// Color / opacity flow through UPDATED with metadata.colors /
+	// metadata.opacities; the viewer refreshes the traits in place.
+	// SnapStep is kept for smoothness (hue cycles look better in
+	// discrete steps at low tick rates), not for wire-cost reasons.
 	hue := visuals.SnapStep(math.Mod(t/6.0, 1.0), 24, 0, 1) // 24 hues / 6 s
 	c := visuals.HSVToRGB(hue, 1, 1)
 	s.movingBox.Color = &c

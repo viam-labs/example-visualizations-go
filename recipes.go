@@ -736,10 +736,10 @@ func (lg *LifecycleGarden) opacityFor(phase string) float64 {
 // Mirrors the standalone-playground's force_vector_demo preset.
 // The arrow's length and radius oscillate on phase-offset sine
 // waves; orientation precesses around world +Z at a fixed tilt.
-// visuals.Color cycling (the standalone preset's hue sweep) is not included
-// because metadata updates don't propagate via UPDATED — only at
-// spawn time. To add color cycling, use the label-rotation pattern
-// from BreathingShapes.
+// visuals.Color cycling (the standalone preset's hue sweep) is not
+// included here — could be added trivially now that metadata.* is
+// honored on UPDATED, but the driver recipe was authored under the
+// pre-fix constraint and kept plain.
 // (Named ForceVectorRecipe — the unqualified “visuals.ForceVector“ is
 // already taken by the visuals visuals.AnimationSpec alias in aliases.go.)
 type ForceVectorRecipe struct {
@@ -797,10 +797,14 @@ func (fv ForceVectorRecipe) Tick(scene *visuals.Scene, t float64) []visuals.Scen
 // ---- breathing_shapes -------------------------------------------------
 
 // BreathingShapes — N spheres whose opacity smoothly cycles in
-// [0, 1] via label rotation. Demonstrates the only working pattern
-// for live opacity changes given the renderer's UPDATED handler
-// ignores metadata.* paths: REMOVE the current label, ADD with a
-// fresh label so the renderer re-reads metadata at spawn.
+// [0, 1] via label rotation. Historically the only working pattern
+// for live opacity changes back when the renderer's UPDATED
+// handler ignored metadata.* paths: REMOVE the current label, ADD
+// with a fresh label so the renderer re-read metadata at spawn.
+// Since the viewer fix landed the same effect is achievable by
+// mutating the sphere's Opacity in place; the label-rotation
+// pattern is preserved here as the reference implementation of the
+// pre-fix workaround.
 //
 // Opacity is snapped to STEPS_PER_PERIOD discrete values per
 // oscillation period so label-rotation rate stays bounded.
@@ -889,10 +893,12 @@ func (bs *BreathingShapes) Tick(scene *visuals.Scene, t float64) []visuals.Scene
 // ColorCycling — N spheres whose color smoothly cycles through the
 // rainbow via label rotation.
 //
-// Sibling to BreathingShapes: same REMOVE+re-ADD pattern (the
-// renderer ignores metadata.color UPDATED paths just like
-// metadata.opacities), but cycles hue instead of opacity. Together
-// they cover the two metadata-only animation knobs.
+// Sibling to BreathingShapes: same historical REMOVE+re-ADD
+// pattern from back when the renderer ignored metadata.color /
+// metadata.opacities UPDATED paths. Both are preserved as
+// reference implementations of the pre-fix workaround; the current
+// viewer honors metadata.* on UPDATED and the same effect is
+// achievable with in-place mutation.
 //
 // Hue snaps to ccStepsPerPeriod discrete values per cycle so the
 // label-rotation rate stays bounded. The phase offset across slots

@@ -193,6 +193,7 @@ What's NOT covered yet (room to grow):
 
 Current pre-release version sequence (latest first):
 
+- 0.0.45 — bump `viam-viz-helpers-go` to the metadata.*-on-UPDATED release. Color / opacity / show_axes_helper / invisible changes now flow through UPDATED events with `metadata.colors` / `metadata.opacities` / `metadata.show_axes_helper` / `metadata.invisible` field-mask paths instead of REMOVE+ADD respawns. Fixes the ghost-arrow race on the force_vector demo. `parent_frame` is still the only remaining respawn trigger. Recipe comments (BreathingShapes / ColorCycling / ForceVectorRecipe) updated to note the workaround is now historical.
 - 0.0.44 — library extracted to [`viam-labs/viam-viz-helpers-go`](https://github.com/viam-labs/viam-viz-helpers-go); module depends on it via go.mod. (0.0.43 shipped a stale binary because the Makefile dep list still referenced the now-deleted `visuals/*.go`; 0.0.44 is the fresh rebuild.)
 - 0.0.42 — `simpleScene` drops the explicit `Close` glue method by no longer embedding `resource.TriviallyCloseable`.
 - 0.0.41 — `SceneHooks` becomes `type SceneHooks = any`. `BuildGeometry` and `BaseGeomForItem` are now optional via `GeometryBuilder` and `BaseGeomProvider` interfaces with library defaults. `simpleScene` implements only `SceneTick`.

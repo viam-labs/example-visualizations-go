@@ -67,12 +67,13 @@ func TestSimpleSceneExample_SceneTickReturnsEventsForMovingBox(t *testing.T) {
 	}
 }
 
-func TestSimpleSceneExample_SceneTickEmitsRespawnForMovingBox(t *testing.T) {
+func TestSimpleSceneExample_SceneTickEmitsMetadataPathsForMovingBox(t *testing.T) {
 	// Moving box mutates color + opacity every step in addition to
-	// pose + dims. Scene escalates events that touch metadata to
-	// the respawn signal (Paths=[]) — SceneServiceBase materializes
-	// the respawn as REMOVE + ADD with fresh UUID, carrying the new
-	// pose AND new metadata in one event sequence.
+	// pose + dims. Scene emits a single UPDATED with the full
+	// field-mask path list — pose subfields + physicalObject dims +
+	// metadata.colors + metadata.opacities. (Pre-fix behavior was
+	// an empty-Paths respawn signal; the viewer fix removed the
+	// need for that escalation.)
 	s := bareScene(t)
 	events := s.SceneTick(s.Scene, 0.5)
 	var movingEvent *visuals.SceneEvent
@@ -88,9 +89,14 @@ func TestSimpleSceneExample_SceneTickEmitsRespawnForMovingBox(t *testing.T) {
 	if movingEvent.Kind != visuals.EventUpdated {
 		t.Errorf("expected EventUpdated, got %v", movingEvent.Kind)
 	}
-	if len(movingEvent.Paths) != 0 {
-		t.Errorf("expected respawn signal (empty Paths) since color "+
-			"and opacity change; got %v", movingEvent.Paths)
+	pathsSeen := map[string]bool{}
+	for _, p := range movingEvent.Paths {
+		pathsSeen[p] = true
+	}
+	for _, required := range []string{"metadata.colors", "metadata.opacities"} {
+		if !pathsSeen[required] {
+			t.Errorf("expected %q in Paths, got %v", required, movingEvent.Paths)
+		}
 	}
 }
 
